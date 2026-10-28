@@ -1,1 +1,409 @@
-<!-- ParkAI -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ParkAI - Find Parking</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px;
+            font-family: Arial, sans-serif;
+            background: #eef5f2;
+            color: #183b38;
+        }
+
+        header {
+            max-width: 1000px;
+            margin: 0 auto 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            margin: 0;
+            color: #0f766e;
+        }
+
+        header p {
+            margin: 5px 0 0;
+            color: #71817c;
+            font-size: 13px;
+        }
+
+        .layout {
+            max-width: 1000px;
+            margin: auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        .card {
+            background: white;
+            padding: 24px;
+            border-radius: 18px;
+            box-shadow: 0 5px 20px #163d3210;
+            border: 1px solid #e0ebe6;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h2 {
+            margin: 0 0 18px;
+            font-size: 19px;
+        }
+
+        .sub {
+            color: #71817c;
+            font-size: 13px;
+        }
+
+        h2+.sub {
+            margin: -10px 0 18px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        select {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #ccdcd5;
+            border-radius: 10px;
+            background: white;
+            font-size: 16px;
+        }
+
+        .fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        #map {
+            flex: 1;
+            min-height: 340px;
+            border-radius: 12px;
+            z-index: 0;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 7px 11px;
+            border-radius: 20px;
+            background: #e1f5e9;
+            color: #167443;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Selected box */
+        #selected {
+            display: none;
+            margin-bottom: 14px;
+            padding: 13px;
+            border-radius: 10px;
+            background: #e1f5e9;
+            color: #167443;
+            font-size: 14px;
+            font-weight: bold;
+            line-height: 1.5;
+        }
+
+        /* Lot cards */
+        .lot {
+            background: #f1f7f4;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 14px;
+        }
+
+        .lot:last-child {
+            margin-bottom: 0;
+        }
+
+        .lot.best,
+        .lot.selected {
+            border-color: #168751;
+            background: #f4fbf7;
+        }
+
+        .lot.selected {
+            box-shadow: 0 0 0 3px #16875133;
+        }
+
+        .lot-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .lot-name {
+            font-weight: bold;
+            font-size: 17px;
+        }
+
+        .free-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin: 14px 0 0;
+        }
+
+        .free {
+            font-size: 42px;
+            font-weight: bold;
+            line-height: 1;
+            color: #168751;
+        }
+
+        .bar {
+            height: 9px;
+            background: #e4ede8;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 16px 0;
+        }
+
+        .bar span {
+            display: block;
+            height: 100%;
+            background: #20a56e;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .stat {
+            padding: 14px;
+            border-radius: 12px;
+            background: white;
+        }
+
+        .stat strong {
+            display: block;
+            font-size: 22px;
+            margin-bottom: 5px;
+        }
+
+        .stat span {
+            color: #71817c;
+            font-size: 12px;
+        }
+
+        .lot button {
+            width: 100%;
+            padding: 15px 12px;
+            margin-top: 14px;
+            border: 0;
+            border-radius: 11px;
+            background: #168751;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .lot button:hover {
+            filter: brightness(0.93);
+        }
+
+        footer {
+            max-width: 1000px;
+            margin: 20px auto 0;
+            text-align: center;
+            color: #71817c;
+            font-size: 12px;
+        }
+
+        @media (max-width: 650px) {
+            body {
+                padding: 16px;
+            }
+
+            .layout {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                margin-bottom: 18px;
+            }
+
+            .card {
+                padding: 19px;
+            }
+
+            .fields {
+                grid-template-columns: 1fr;
+            }
+
+            #map {
+                flex: none;
+                height: 260px;
+                min-height: 0;
+            }
+
+            .free {
+                font-size: 36px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div>
+            <h1>ParkAI <span style="font-size:14px">●</span></h1>
+            <p>Find Parking</p>
+        </div>
+        <span class="badge">Live Availability</span>
+    </header>
+
+    <main class="layout">
+        <section class="card">
+            <h2>Plan Your Trip</h2>
+            <p class="sub">Choose where you are going and when you will arrive.</p>
+
+            <div class="fields">
+                <div>
+                    <label for="dest">Destination</label>
+                    <select id="dest">
+                        <option value="28.5494,77.2530,City Mall">City Mall</option>
+                        <option value="28.5470,77.2510,Hospital">Hospital</option>
+                        <option value="28.5510,77.2560,Market">Market</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="hourSelect">Arrival time</label>
+                    <select id="hourSelect">
+                        <option value="">Now</option>
+                        <option value="9">9 AM</option>
+                        <option value="12">12 PM (rush)</option>
+                        <option value="18">6 PM</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="map"></div>
+        </section>
+
+        <section class="card">
+            <h2>Recommended Lots</h2>
+            <p class="sub">Ranked by free spaces, predicted crowd and distance.</p>
+            <div id="selected"></div>
+            <div id="results"></div>
+        </section>
+    </main>
+
+    <footer>ParkAI • Smart Parking Management</footer>
+
+    <script>
+        const map = L.map('map').setView([28.5494, 77.2530], 16);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+        window.addEventListener('load', () => map.invalidateSize());
+
+        let markers = [];
+        let selectedName = null; // remembers the chosen lot, even after auto-refresh
+
+        function clearMarkers() {
+            markers.forEach(m => map.removeLayer(m));
+            markers = [];
+        }
+
+        function showSelectedBox(name, free, dist) {
+            const box = document.getElementById('selected');
+            box.style.display = 'block';
+            box.textContent = `✓ ${name} selected: ${free} free, ${dist} m away`;
+        }
+
+        function selectLot(name, free, dist) {
+            selectedName = name;
+            showSelectedBox(name, free, dist);
+            document.querySelectorAll('.lot').forEach(c => {
+                const isSel = c.dataset.name === name;
+                c.classList.toggle('selected', isSel);
+                c.querySelector('button').textContent = isSel ? 'Selected ✓' : 'Select Lot';
+            });
+        }
+
+        async function search() {
+            const parts = document.getElementById('dest').value.split(',');
+            const lat = parts[0], lng = parts[1], destName = parts[2];
+            const hour = document.getElementById('hourSelect').value;
+
+            let url = `/api/recommend?lat=${lat}&lng=${lng}`;
+            if (hour) url += `&hour=${hour}`;
+
+            const res = await fetch(url);
+            const lots = await res.json();
+
+            clearMarkers();
+            map.setView([Number(lat), Number(lng)], 16);
+
+            const destMarker = L.marker([Number(lat), Number(lng)]).addTo(map).bindPopup('Destination: ' + destName);
+            markers.push(destMarker);
+
+            const results = document.getElementById('results');
+            results.innerHTML = '';
+
+            for (const lot of lots) {
+                const m = L.marker([lot.lat, lot.lng]).addTo(map).bindPopup(`${lot.name}: ${lot.free} free`);
+                markers.push(m);
+
+                const card = document.createElement('div');
+                card.className = 'lot' + (lot.best ? ' best' : '');
+                card.dataset.name = lot.name;
+                card.innerHTML = `
+        <div class="lot-top">
+          <span class="lot-name">${lot.name}</span>
+          ${lot.best ? '<span class="badge">BEST</span>' : ''}
+        </div>
+        <div class="free-row">
+          <span class="free">${lot.free}</span>
+          <span class="sub">spaces free</span>
+        </div>
+        <div class="bar"><span style="width:${Math.min(100, lot.predicted_occupancy)}%"></span></div>
+        <div class="stats">
+          <div class="stat"><strong>${lot.predicted_occupancy}%</strong><span>Predicted full</span></div>
+          <div class="stat"><strong>${lot.distance_m} m</strong><span>From destination</span></div>
+        </div>
+        <button>Select Lot</button>`;
+                card.querySelector('button').addEventListener('click', () =>
+                    selectLot(lot.name, lot.free, lot.distance_m));
+                if (lot.name === selectedName) {
+                    card.classList.add('selected');
+                    card.querySelector('button').textContent = 'Selected ✓';
+                    showSelectedBox(lot.name, lot.free, lot.distance_m);
+                }
+                results.appendChild(card);
+            }
+            map.invalidateSize();
+        }
+
+        document.getElementById('dest').addEventListener('change', search);
+        document.getElementById('hourSelect').addEventListener('change', search);
+        search();
+        setInterval(search, 10000); // live update every 10 seconds
+    </script>
+</body>
+
+</html>
