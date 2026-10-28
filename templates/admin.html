@@ -1,1 +1,157 @@
 <!-- ParkAI -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkAI Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 16px; background: #f3f7f6; }
+  h1 { color: #0f766e; }
+  h2 { margin-top: 28px; color: #0f766e; }
+  table { width: 100%; border-collapse: collapse; background: white; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 14px; }
+  th { background: #0f766e; color: white; }
+  input { padding: 8px; margin: 4px; }
+  button { padding: 8px 16px; background: #0f766e; color: white; border: none; border-radius: 6px; cursor: pointer; }
+  #formMsg { color: #b00020; }
+  .chartbox { background: white; padding: 12px; border-radius: 8px; }
+</style>
+</head>
+<body>
+  <h1>ParkAI Admin Dashboard</h1>
+
+  <h2>Naya Lot Add Karo</h2>
+  <input id="lname" placeholder="Name (Lot D)">
+  <input id="lcap" type="number" placeholder="Capacity">
+  <input id="llat" type="number" step="any" placeholder="Latitude">
+  <input id="llng" type="number" step="any" placeholder="Longitude">
+  <button id="addBtn">Add Lot</button>
+  <p id="formMsg"></p>
+
+  <h2>Lots</h2>
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Capacity</th><th>Occupied</th><th>Free</th><th>Last Updated</th></tr>
+    </thead>
+    <tbody id="lotsTable"></tbody>
+  </table>
+
+  <h2>Hourly Occupancy (History)</h2>
+  <select id="chartLot"></select>
+  <div class="chartbox"><canvas id="chart"></canvas></div>
+
+  <h2>Activity Log</h2>
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Lot</th><th>Action</th><th>Operator</th></tr>
+    </thead>
+    <tbody id="logTable"></tbody>
+  </table>
+
+<script>
+  let myChart = null;
+  let lotsLoaded = false;
+
+  async function loadLots() {
+    const res = await fetch('/api/lots');
+    const lots = await res.json();
+
+    let html = '';
+    for (const lot of lots) {
+      html += `<tr><td>${lot.name}</td><td>${lot.capacity}</td><td>${lot.current_count}</td><td>${lot.free}</td><td>${lot.last_updated}</td></tr>`;
+    }
+    document.getElementById('lotsTable').innerHTML = html;
+
+    const sel = document.getElementById('chartLot');
+    if (!lotsLoaded || sel.options.length !== lots.length) {
+      const previous = sel.value;
+      sel.innerHTML = '';
+      for (const lot of lots) {
+        const opt = document.createElement('option');
+        opt.value = lot.id;
+        opt.textContent = lot.name;
+        sel.appendChild(opt);
+      }
+      if (previous) sel.value = previous;
+      lotsLoaded = true;
+      loadChart();
+    }
+  }
+
+  async function loadLogs() {
+    const res = await fetch('/api/logs');
+    const logs = await res.json();
+
+    let html = '';
+    for (const l of logs) {
+      html += `<tr><td>${l.timestamp}</td><td>${l.lot_name}</td><td>${l.action}</td><td>${l.operator}</td></tr>`;
+    }
+    document.getElementById('logTable').innerHTML = html;
+  }
+
+  async function loadChart() {
+    const id = document.getElementById('chartLot').value;
+    if (!id) return;
+
+    const res = await fetch('/api/history/' + id);
+    const data = await res.json();
+
+    if (myChart) myChart.destroy();
+
+    myChart = new Chart(document.getElementById('chart'), {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.hour + ':00'),
+        datasets: [{
+          label: 'Average Occupancy %',
+          data: data.map(d => d.occupancy),
+          backgroundColor: '#5b7bd5'
+        }]
+      },
+      options: {
+        scales: {
+          y: { min: 0, max: 100 }
+        }
+      }
+    });
+  }
+
+  document.getElementById('addBtn').addEventListener('click', async () => {
+    const body = {
+      name: document.getElementById('lname').value,
+      capacity: Number(document.getElementById('lcap').value),
+      lat: Number(document.getElementById('llat').value),
+      lng: Number(document.getElementById('llng').value)
+    };
+
+    const res = await fetch('/api/lots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    const data = await res.json();
+    document.getElementById('formMsg').textContent = data.error ? data.error : '';
+
+    if (!data.error) {
+      ['lname', 'lcap', 'llat', 'llng'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      loadLots();
+    }
+  });
+
+  document.getElementById('chartLot').addEventListener('change', loadChart);
+
+  loadLots();
+  loadLogs();
+  setInterval(() => {
+    loadLots();
+    loadLogs();
+  }, 5000);
+</script>
+</body>
+</html>
