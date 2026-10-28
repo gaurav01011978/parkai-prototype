@@ -1,1 +1,373 @@
-<!-- ParkAI -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ParkAI Operator</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 24px;
+    font-family: Arial, sans-serif;
+    background: #eef5f2;
+    color: #183b38;
+}
+
+header {
+    max-width: 1000px;
+    margin: 0 auto 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+h1 { margin: 0; color: #0f766e; }
+header p { margin: 5px 0 0; color: #71817c; font-size: 13px; }
+
+.layout {
+    max-width: 1000px;
+    margin: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.card {
+    background: white;
+    padding: 24px;
+    border-radius: 18px;
+    box-shadow: 0 5px 20px #163d3210;
+    border: 1px solid #e0ebe6;
+}
+
+h2 { margin: 0 0 18px; font-size: 19px; }
+
+label { display: block; margin-bottom: 8px; font-size: 14px; }
+
+select {
+    width: 100%;
+    padding: 13px;
+    border: 1px solid #ccdcd5;
+    border-radius: 10px;
+    background: white;
+    font-size: 16px;
+}
+
+.status {
+    margin: 22px 0 5px;
+    font-size: 42px;
+    font-weight: bold;
+    color: #168751;
+}
+
+.sub { color: #71817c; font-size: 13px; }
+
+.bar {
+    height: 9px;
+    background: #e4ede8;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 18px 0;
+}
+
+#fill { height: 100%; width: 0; background: #20a56e; }
+
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.stat {
+    padding: 16px;
+    border-radius: 12px;
+    background: #f1f7f4;
+}
+
+.stat strong { display: block; font-size: 25px; margin-bottom: 5px; }
+.stat span { color: #71817c; font-size: 12px; }
+
+.badge {
+    display: inline-block;
+    padding: 7px 11px;
+    border-radius: 20px;
+    background: #e1f5e9;
+    color: #167443;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.warning { background: #fff0cf; color: #895500; }
+.full { background: #ffe3e3; color: #b42332; }
+
+#alert {
+    margin-top: 16px;
+    padding: 13px;
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+button {
+    width: 100%;
+    padding: 17px 12px;
+    margin: 6px 0;
+    border: 0;
+    border-radius: 11px;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:disabled { opacity: .45; cursor: not-allowed; }
+#entry { background: #168751; }
+#exit { background: #d94955; }
+#undo { background: #53656b; }
+
+#message {
+    margin-top: 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+footer {
+    max-width: 1000px;
+    margin: 20px auto 0;
+    text-align: center;
+    color: #71817c;
+    font-size: 12px;
+}
+
+@media (max-width: 650px) {
+    body { padding: 16px; }
+    .layout { grid-template-columns: 1fr; }
+    header { margin-bottom: 18px; }
+    .card { padding: 19px; }
+    .status { font-size: 36px; }
+}
+</style>
+</head>
+
+<body>
+<header>
+    <div>
+        <h1>ParkAI <span style="font-size:14px">●</span></h1>
+        <p>Parking Operator Console</p>
+    </div>
+    <span class="badge">Live Dashboard</span>
+</header>
+
+<main class="layout">
+    <section class="card">
+        <h2>Parking Overview</h2>
+
+        <label for="lot">Select parking lot</label>
+        <select id="lot">
+            <option value="">Loading lots...</option>
+        </select>
+
+        <div style="margin-top:24px">
+            <span id="badge" class="badge">Loading</span>
+            <div id="status" class="status">-- / --</div>
+            <div class="sub">Available parking spaces</div>
+        </div>
+
+        <div class="bar"><div id="fill"></div></div>
+
+        <div class="stats">
+            <div class="stat">
+                <strong id="parked">--</strong>
+                <span>Vehicles parked</span>
+            </div>
+            <div class="stat">
+                <strong id="free">--</strong>
+                <span>Spaces available</span>
+            </div>
+        </div>
+
+        <div id="alert" hidden></div>
+        <p class="sub" id="updated">Last updated: --</p>
+    </section>
+
+    <section class="card">
+        <h2>Vehicle Controls</h2>
+        <p class="sub">Record vehicles entering and leaving this lot.</p>
+
+        <button id="entry" disabled>↓ &nbsp; Vehicle Entry</button>
+        <button id="exit" disabled>↑ &nbsp; Vehicle Exit</button>
+        <button id="undo" disabled>↶ &nbsp; Undo Last Action</button>
+
+        <p class="sub" id="hint">Select a lot to begin.</p>
+        <div id="message" role="status" aria-live="polite"></div>
+    </section>
+</main>
+
+<footer>ParkAI • Smart Parking Management</footer>
+
+<script>
+const OPERATOR = "Op-12";
+const $ = id => document.getElementById(id);
+
+let lots = [];
+let busy = false;
+let loading = false;
+
+function selected() {
+    return lots.find(x => Number(x.id) === Number($("lot").value));
+}
+
+function say(text, type = "") {
+    $("message").textContent = text;
+    $("message").style.color =
+        type === "error" ? "#b42332" :
+        type === "success" ? "#168751" : "#53656b";
+}
+
+function render() {
+    const x = selected();
+    const alert = $("alert");
+
+    if (!x) {
+        $("status").textContent = "-- / --";
+        $("parked").textContent = "--";
+        $("free").textContent = "--";
+        $("badge").textContent = "No lot selected";
+        $("badge").className = "badge";
+        $("updated").textContent = "Last updated: --";
+        $("fill").style.width = "0%";
+        alert.hidden = true;
+        $("entry").disabled = $("exit").disabled = $("undo").disabled = true;
+        $("hint").textContent = "Select a lot to begin.";
+        return;
+    }
+
+    const capacity = Math.max(0, Number(x.capacity) || 0);
+    const free = Math.max(0, Number(x.free) || 0);
+    const parked = Math.max(0, Number(x.current_count) || 0);
+    const full = free === 0;
+    const nearly = !full && capacity > 0 && free / capacity <= 0.1;
+    const occupied = capacity ? Math.min(100, 100 * (capacity - free) / capacity) : 0;
+
+    $("status").textContent = `${free} / ${capacity}`;
+    $("parked").textContent = parked;
+    $("free").textContent = free;
+    $("fill").style.width = `${occupied}%`;
+    $("fill").style.background = full ? "#d94955" : nearly ? "#e6a33a" : "#20a56e";
+    $("badge").textContent = full ? "FULL" : nearly ? "Nearly Full" : "Available";
+    $("badge").className = "badge" + (full ? " full" : nearly ? " warning" : "");
+
+    alert.hidden = false;
+    if (full) {
+        alert.className = "full";
+        alert.textContent = `${x.name} is full! Please select another parking lot for incoming vehicles.`;
+    } else if (nearly) {
+        alert.className = "warning";
+        alert.textContent = `Only ${free} spaces left in ${x.name}. Consider using another lot.`;
+    } else {
+        alert.hidden = true;
+    }
+
+    $("updated").textContent = `Last updated: ${x.last_updated || "Unknown"}`;
+    $("entry").disabled = busy || full;
+    $("exit").disabled = busy || parked <= 0;
+    $("undo").disabled = busy;
+
+    $("hint").textContent = busy ? "Action in progress..." :
+        full ? "Select another lot before recording entry." :
+        parked <= 0 ? "No vehicles recorded for exit." :
+        "Choose an action above.";
+}
+
+async function loadLots() {
+    if (loading) return;
+    loading = true;
+
+    try {
+        const res = await fetch("/api/lots", { cache: "no-store" });
+        if (!res.ok) throw new Error("Could not load parking lots.");
+
+        const data = await res.json();
+        if (!Array.isArray(data)) throw new Error("Unexpected server response.");
+
+        const previous = $("lot").value;
+        lots = data;
+        $("lot").innerHTML = "";
+
+        data.forEach(x => {
+            const option = document.createElement("option");
+            option.value = x.id;
+            option.textContent = x.name;
+            $("lot").appendChild(option);
+        });
+
+        if (data.some(x => String(x.id) === previous)) $("lot").value = previous;
+        render();
+    } catch (e) {
+        say(e.message || "Connection failed.", "error");
+    } finally {
+        loading = false;
+    }
+}
+
+async function act(action) {
+    if (busy) return;
+
+    const x = selected();
+    if (!x) return say("Please select a parking lot.", "error");
+
+    if (action === "ENTRY" && Number(x.free) <= 0)
+        return say(`${x.name} is full. Select another lot.`, "error");
+
+    if (action === "EXIT" && Number(x.current_count) <= 0)
+        return say("No vehicles are parked here.", "error");
+
+    if (action === "UNDO" && !confirm("Undo the last action for this lot?"))
+        return;
+
+    busy = true;
+    render();
+    say("Updating parking status...");
+
+    try {
+        const undo = action === "UNDO";
+        const res = await fetch(undo ? "/api/undo" : "/api/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(undo
+                ? { lot_id: x.id }
+                : { lot_id: x.id, action, operator: OPERATOR })
+        });
+
+        const data = await res.json();
+        if (!res.ok || data.error) throw new Error(data.error || "Action failed.");
+
+        say(action === "UNDO" ? "Last action undone." :
+            action === "ENTRY" ? "Vehicle entry recorded." :
+            "Vehicle exit recorded.", "success");
+
+        await loadLots();
+    } catch (e) {
+        say(e.message || "Request failed.", "error");
+    } finally {
+        busy = false;
+        render();
+    }
+}
+
+$("lot").addEventListener("change", () => {
+    render();
+    say("");
+});
+
+$("entry").addEventListener("click", () => act("ENTRY"));
+$("exit").addEventListener("click", () => act("EXIT"));
+$("undo").addEventListener("click", () => act("UNDO"));
+
+loadLots();
+setInterval(loadLots, 5000);
+</script>
+</body>
+</html>
