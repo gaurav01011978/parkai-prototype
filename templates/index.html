@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParkAI | Smart Parking Management</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="/" class="logo">Park<span>AI</span><small> SMART PARKING</small></a>
+        <div class="nav-links">
+            <a href="#features">Features</a>
+            <a href="#portals">Portals</a>
+        </div>
+        <a href="#portals" class="nav-button">Get Started ↗</a>
+    </nav>
+
+    <main>
+        <section class="hero">
+            <div class="tag">✦ INTELLIGENT PARKING MANAGEMENT</div>
+
+            <h1>Park smarter.<br>
+                <span>Move better.</span>
+            </h1>
+
+            <p class="hero-description">
+                Find smarter parking solutions with AI-powered occupancy
+                predictions, real-time parking updates, and intelligent
+                parking recommendations.
+            </p>
+
+            <div class="hero-actions">
+                <a href="#portals" class="primary-button">
+                    Explore ParkAI <span>→</span>
+                </a>
+                <a href="#features" class="secondary-button">
+                    Discover features
+                </a>
+            </div>
+
+            <div class="hero-note">
+                <span class="status-dot"></span>
+                Smarter parking starts here
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <div class="feature">
+                <div class="feature-icon">◷</div>
+                <div>
+                    <h3>Occupancy insights</h3>
+                    <p>Understand parking availability and occupancy trends.</p>
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">⌖</div>
+                <div>
+                    <h3>Smart recommendations</h3>
+                    <p>Rank parking lots by availability, prediction and distance.</p>
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">↗</div>
+                <div>
+                    <h3>Live updates</h3>
+                    <p>Track parking entries, exits and available spaces.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="portals" id="portals">
+            <div class="section-heading">
+                <span class="eyebrow">YOUR PARKAI WORKSPACE</span>
+                <h2>How would you like to continue?</h2>
+                <p>Choose the portal that matches your role.</p>
+            </div>
+
+            <div class="card-container">
+                <a href="{{ url_for('operator_page') }}" class="portal-card">
+                    <div class="card-top">
+                        <div class="card-icon operator-icon">↔</div>
+                        <span class="card-number">01</span>
+                    </div>
+                    <h3>Operator</h3>
+                    <p>Manage parking occupancy, record vehicle entries
+                       and exits, and review activity logs.</p>
+                    <div class="card-link">Open operator portal <span>→</span></div>
+                </a>
+
+                <a href="{{ url_for('user_page') }}" class="portal-card">
+                    <div class="card-top">
+                        <div class="card-icon user-icon">⌖</div>
+                        <span class="card-number">02</span>
+                    </div>
+                    <h3>User</h3>
+                    <p>Explore parking options and get recommendations
+                       based on availability, predicted occupancy and distance.</p>
+                    <div class="card-link">Explore parking <span>→</span></div>
+                </a>
+
+                <a href="{{ url_for('admin_page') }}" class="portal-card">
+                    <div class="card-top">
+                        <div class="card-icon admin-icon">⚙</div>
+                        <span class="card-number">03</span>
+                    </div>
+                    <h3>Admin</h3>
+                    <p>Access the administration interface for parking
+                       system management.</p>
+                    <div class="card-link">Open admin portal <span>→</span></div>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <a href="/" class="footer-logo">Park<span>AI</span></a>
+        <p>Intelligent parking. Better journeys.</p>
+        <span>© 2026 ParkAI Prototype</span>
+    </footer>
+
+</body>
+</html>
