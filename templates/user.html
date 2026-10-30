@@ -329,6 +329,7 @@
     </main>
 
     <footer>ParkAI • Smart Parking Management</footer>
+    <script src="/static/alt.js"></script>
 
     <script>
         const map = L.map('map').setView([28.5494, 77.2530], 16);
@@ -403,7 +404,7 @@
         <button>SELECT</button>
         <a class="rsv" href="/reserve?lot=${lot.id}">Reserve slots</a>`;
                 card.querySelector('button').addEventListener('click', () =>
-                    selectLot(lot.name, lot.free, lot.distance_m));
+    window.parkaiSelect ? window.parkaiSelect(lot) : selectLot(lot.name, lot.free, lot.distance_m));
                 if (lot.name === selectedName) {
                     card.classList.add('selected');
                     card.querySelector('button').textContent = 'Selected ✓';

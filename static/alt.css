@@ -1,0 +1,293 @@
+/* ParkAI - Faster Parking Option popup (user.html ke existing colours ke saath match) */
+
+/* Starting point dropdown */
+.alt-start {
+    margin-bottom: 18px;
+}
+
+/* Overlay + popup */
+.alt-lock {
+    overflow: hidden;
+}
+
+.alt-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(15, 40, 36, 0.55);
+    backdrop-filter: blur(2px);
+    animation: alt-fade 0.2s ease-out both;
+}
+
+.alt-dialog {
+    width: 100%;
+    max-width: 640px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    padding: 26px;
+    border-radius: 20px;
+    background: #fff;
+    color: #183b38;
+    box-shadow: 0 24px 60px rgba(15, 60, 50, 0.35);
+    animation: alt-pop 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.alt-title {
+    margin: 0 0 6px;
+    font-size: 22px;
+    color: #0f766e;
+}
+
+.alt-sub {
+    margin: 0 0 18px;
+    color: #4f635e;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.alt-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.alt-col {
+    padding: 16px;
+    border-radius: 14px;
+    border: 2px solid transparent;
+}
+
+/* original = neutral */
+.alt-col-orig {
+    background: #f1f5f4;
+    border-color: #dbe5e1;
+}
+
+/* better option = green */
+.alt-col-alt {
+    background: #f4fbf7;
+    border-color: #168751;
+    box-shadow: 0 0 0 3px #16875122;
+}
+
+.alt-tag {
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #71817c;
+}
+
+.alt-col-alt .alt-tag {
+    color: #167443;
+}
+
+.alt-lot-name {
+    margin: 4px 0 8px;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.alt-saves {
+    display: inline-block;
+    margin-bottom: 10px;
+    padding: 5px 11px;
+    border-radius: 20px;
+    background: #168751;
+    color: #fff;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.alt-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 9px 0;
+    border-top: 1px solid #00000010;
+}
+
+.alt-row-label {
+    color: #71817c;
+    font-size: 12px;
+}
+
+.alt-row-value {
+    font-size: 16px;
+}
+
+.alt-col-alt .alt-time {
+    color: #168751;
+    font-size: 20px;
+}
+
+.alt-col-orig .alt-time {
+    font-size: 20px;
+}
+
+/* traffic warning = amber */
+.alt-warn {
+    display: inline-block;
+    align-self: flex-start;
+    padding: 3px 9px;
+    border-radius: 8px;
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #f59e0b;
+    font-size: 13px;
+}
+
+.alt-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.alt-btn {
+    flex: 1;
+    padding: 14px 12px;
+    border-radius: 11px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.alt-btn:focus-visible {
+    outline: 3px solid #0f766e66;
+    outline-offset: 2px;
+}
+
+.alt-btn-primary {
+    border: 0;
+    background: #168751;
+    color: #fff;
+}
+
+.alt-btn-primary:hover {
+    filter: brightness(0.93);
+}
+
+.alt-btn-secondary {
+    border: 2px solid #c5d3ce;
+    background: #fff;
+    color: #3d544f;
+}
+
+.alt-btn-secondary:hover {
+    background: #f1f5f4;
+}
+
+.alt-note {
+    margin: 14px 0 0;
+    text-align: center;
+    color: #8a9a95;
+    font-size: 12px;
+}
+
+/* Toast: loading / error / no-alternative */
+.alt-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 22px;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100vw - 32px);
+    padding: 12px 18px;
+    border-radius: 12px;
+    background: #183b38;
+    color: #fff;
+    font-size: 14px;
+    box-shadow: 0 8px 28px rgba(15, 60, 50, 0.3);
+    opacity: 0;
+    transform: translate(-50%, 14px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.alt-toast.alt-show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.alt-toast-ok {
+    background: #167443;
+}
+
+.alt-toast-warn {
+    background: #92400e;
+}
+
+.alt-spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid #ffffff55;
+    border-top-color: #fff;
+    animation: alt-spin 0.8s linear infinite;
+}
+
+@keyframes alt-fade {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes alt-pop {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.96);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes alt-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Mobile */
+@media (max-width: 650px) {
+    .alt-dialog {
+        padding: 20px;
+    }
+
+    .alt-cols {
+        grid-template-columns: 1fr;
+    }
+
+    .alt-actions {
+        flex-direction: column-reverse;
+    }
+
+    .alt-title {
+        font-size: 20px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .alt-overlay,
+    .alt-dialog,
+    .alt-spinner {
+        animation: none;
+    }
+
+    .alt-toast {
+        transition: none;
+    }
+}

@@ -4,6 +4,7 @@ from math import radians, sin, cos, asin, sqrt
 from database import (get_conn, get_tx_conn, tx_begin, tx_commit, tx_rollback, init_db,
                       expire_old, reserved_counts, log_event, now_str)
 from reservations import bp as reservations_bp
+from traffic_alternative import bp as traffic_bp
 
 try:
     from predict import predict_occupancy
@@ -12,8 +13,10 @@ except Exception:
         return 50
 
 app = Flask(__name__)
+
 init_db()
 app.register_blueprint(reservations_bp)
+app.register_blueprint(traffic_bp)
 
 
 def distance_m(lat1, lng1, lat2, lng2):
