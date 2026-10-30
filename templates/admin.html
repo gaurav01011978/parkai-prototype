@@ -1,5 +1,3 @@
-<!-- ParkAI -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,10 +16,15 @@
   button { padding: 8px 16px; background: #0f766e; color: white; border: none; border-radius: 6px; cursor: pointer; }
   #formMsg { color: #b00020; }
   .chartbox { background: white; padding: 12px; border-radius: 8px; }
+  .links a { color: #0f766e; font-weight: bold; text-decoration: none; margin-right: 16px; }
 </style>
 </head>
 <body>
   <h1>ParkAI Admin Dashboard</h1>
+  <p class="links">
+    <a href="/">Home</a>
+    <a href="/admin/security">Reservations &amp; Security →</a>
+  </p>
 
   <h2>Add New Lot</h2>
   <input id="lname" placeholder="Name (Lot D)">
@@ -34,7 +37,7 @@
   <h2>Lots</h2>
   <table>
     <thead>
-      <tr><th>Name</th><th>Capacity</th><th>Occupied</th><th>Free</th><th>Last Updated</th></tr>
+      <tr><th>Name</th><th>Capacity</th><th>Occupied</th><th>Reserved</th><th>Free</th><th>Last Updated</th></tr>
     </thead>
     <tbody id="lotsTable"></tbody>
   </table>
@@ -61,7 +64,7 @@
 
     let html = '';
     for (const lot of lots) {
-      html += `<tr><td>${lot.name}</td><td>${lot.capacity}</td><td>${lot.current_count}</td><td>${lot.free}</td><td>${lot.last_updated}</td></tr>`;
+      html += `<tr><td>${lot.name}</td><td>${lot.capacity}</td><td>${lot.current_count}</td><td>${lot.reserved}</td><td>${lot.free}</td><td>${lot.last_updated}</td></tr>`;
     }
     document.getElementById('lotsTable').innerHTML = html;
 

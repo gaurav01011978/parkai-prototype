@@ -11,7 +11,28 @@ def predict_occupancy(lot_id, hour):
 
     df = pd.read_sql_query(
         """
-        SELECT occupancy_percent
+        SELECT occupancy_percentimport pandas as pd
+from database import get_conn
+
+
+def predict_occupancy(lot_id, hour):
+    """Us lot ka us ghante ka average occupancy % (purane data se)"""
+    conn = get_conn()
+    df = pd.read_sql_query(
+        "SELECT occupancy_percent FROM history WHERE lot_id = ? AND hour = ?",
+        conn,
+        params=(lot_id, hour),
+    )
+    conn.close()
+
+    if df.empty:
+        return 50  # data nahi hai toh neutral
+    return int(round(df["occupancy_percent"].mean()))
+
+
+if __name__ == "__main__":
+    print("12 baje:", predict_occupancy(1, 12))
+    print("8 baje:", predict_occupancy(1, 8))
         FROM history
         WHERE lot_id = ? AND hour = ?
         """,

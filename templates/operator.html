@@ -1,5 +1,4 @@
-<!-- ParkAI -->
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -77,7 +76,7 @@ select {
 
 #fill { height: 100%; width: 0; background: #20a56e; }
 
-.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 
 .stat {
     padding: 16px;
@@ -85,7 +84,7 @@ select {
     background: #f1f7f4;
 }
 
-.stat strong { display: block; font-size: 25px; margin-bottom: 5px; }
+.stat strong { display: block; font-size: 24px; margin-bottom: 5px; }
 .stat span { color: #71817c; font-size: 12px; }
 
 .badge {
@@ -156,6 +155,7 @@ footer {
     <div>
         <h1>ParkAI <span style="font-size:14px">●</span></h1>
         <p>Parking Operator Console</p>
+        <p><a href="/checkin" style="color:#0f766e;font-weight:bold;text-decoration:none">Reserved gaadi check-in →</a></p>
     </div>
     <span class="badge">Live Dashboard</span>
 </header>
@@ -172,7 +172,7 @@ footer {
         <div style="margin-top:24px">
             <span id="badge" class="badge">Loading</span>
             <div id="status" class="status">-- / --</div>
-            <div class="sub">Available parking spaces</div>
+            <div class="sub">Available parking spaces (walk-in)</div>
         </div>
 
         <div class="bar"><div id="fill"></div></div>
@@ -185,6 +185,10 @@ footer {
             <div class="stat">
                 <strong id="free">--</strong>
                 <span>Spaces available</span>
+            </div>
+            <div class="stat">
+                <strong id="reserved">--</strong>
+                <span>Reserved</span>
             </div>
         </div>
 
@@ -234,6 +238,7 @@ function render() {
         $("status").textContent = "-- / --";
         $("parked").textContent = "--";
         $("free").textContent = "--";
+        $("reserved").textContent = "--";
         $("badge").textContent = "No lot selected";
         $("badge").className = "badge";
         $("updated").textContent = "Last updated: --";
@@ -247,22 +252,28 @@ function render() {
     const capacity = Math.max(0, Number(x.capacity) || 0);
     const free = Math.max(0, Number(x.free) || 0);
     const parked = Math.max(0, Number(x.current_count) || 0);
-    const full = free === 0;
+    const reserved = Math.max(0, Number(x.reserved) || 0);
+    const trueFull = capacity - parked <= 0;      // lot sach me bhar chuka
+    const full = free === 0;                      // walk-in ke liye jagah nahi
     const nearly = !full && capacity > 0 && free / capacity <= 0.1;
     const occupied = capacity ? Math.min(100, 100 * (capacity - free) / capacity) : 0;
 
     $("status").textContent = `${free} / ${capacity}`;
     $("parked").textContent = parked;
     $("free").textContent = free;
+    $("reserved").textContent = reserved;
     $("fill").style.width = `${occupied}%`;
     $("fill").style.background = full ? "#d94955" : nearly ? "#e6a33a" : "#20a56e";
-    $("badge").textContent = full ? "FULL" : nearly ? "Nearly Full" : "Available";
-    $("badge").className = "badge" + (full ? " full" : nearly ? " warning" : "");
+    $("badge").textContent = trueFull ? "FULL" : full ? "Only Reserved Left" : nearly ? "Nearly Full" : "Available";
+    $("badge").className = "badge" + (trueFull ? " full" : (full || nearly) ? " warning" : "");
 
     alert.hidden = false;
-    if (full) {
+    if (trueFull) {
         alert.className = "full";
         alert.textContent = `${x.name} is full! Please select another parking lot for incoming vehicles.`;
+    } else if (full) {
+        alert.className = "warning";
+        alert.textContent = `All remaining spaces in ${x.name} are reserved (${reserved}). Walk-in entry is blocked. Booked vehicles must be checked in with Code + OTP.`;
     } else if (nearly) {
         alert.className = "warning";
         alert.textContent = `Only ${free} spaces left in ${x.name}. Consider using another lot.`;
@@ -271,12 +282,13 @@ function render() {
     }
 
     $("updated").textContent = `Last updated: ${x.last_updated || "Unknown"}`;
-    $("entry").disabled = busy || full;
+    $("entry").disabled = busy || trueFull;
     $("exit").disabled = busy || parked <= 0;
     $("undo").disabled = busy;
 
     $("hint").textContent = busy ? "Action in progress..." :
-        full ? "Select another lot before recording entry." :
+        trueFull ? "Select another lot before recording entry." :
+        full ? "Only reserved spaces remain. Use Reserved check-in for booked vehicles." :
         parked <= 0 ? "No vehicles recorded for exit." :
         "Choose an action above.";
 }
@@ -318,7 +330,7 @@ async function act(action) {
     const x = selected();
     if (!x) return say("Please select a parking lot.", "error");
 
-    if (action === "ENTRY" && Number(x.free) <= 0)
+    if (action === "ENTRY" && Number(x.capacity) - Number(x.current_count) <= 0)
         return say(`${x.name} is full. Select another lot.`, "error");
 
     if (action === "EXIT" && Number(x.current_count) <= 0)

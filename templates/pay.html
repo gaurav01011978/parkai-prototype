@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkAI · Payment</title>
+<link rel="stylesheet" href="/static/ui.css">
+</head>
+<body>
+<div class="top"><div class="in">
+  <div class="brand"><div class="logo">P</div>Secure Payment (Demo)</div>
+</div></div>
+
+<div class="wrap">
+  <div class="card" id="sum">Loading...</div>
+
+  <div class="card" id="payBox" hidden>
+    <h2>Payment method</h2>
+    <div class="row">
+      <button class="btn active" id="tabUpi" type="button">UPI</button>
+      <button class="btn ghost" id="tabCard" type="button">Card</button>
+    </div>
+
+    <div id="upiForm">
+      <label>UPI ID</label><input id="upi" placeholder="name@upi">
+    </div>
+    <div id="cardForm" hidden>
+      <label>Card number</label><input id="card" inputmode="numeric" maxlength="19" placeholder="1234 5678 9012 3456">
+      <div class="row">
+        <div><label>Expiry</label><input id="exp" placeholder="MM/YY"></div>
+        <div><label>CVV</label><input id="cvv" inputmode="numeric" maxlength="3" placeholder="123"></div>
+      </div>
+    </div>
+
+    <button class="btn ok full" id="payBtn" style="margin-top:14px">Pay</button>
+    <div class="err" id="err"></div>
+    <p class="muted">Demo gateway: koi bhi <b>name@upi</b> pass hoga. <b>fail@upi</b> ya <b>0000</b> par khatam hone wala card decline hoga. Asli paise nahi kat te.</p>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden>Bank se baat ho rahi hai...</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const code = location.pathname.split('/').pop();
+  const t = new URLSearchParams(location.search).get('t') || '';
+  const ticketUrl = `/ticket/${code}?t=${encodeURIComponent(t)}`;
+  let method = 'UPI', left = 0, timer = null;
+
+  function tick() {
+    left--;
+    if (left <= 0) {
+      clearInterval(timer);
+      $('payBox').hidden = true;
+      $('timer').className = 'pill bad';
+      $('timer').textContent = 'Time khatam. Slots release ho gaye.';
+      return;
+    }
+    const m = String(Math.floor(left / 60)).padStart(2, '0'), s = String(left % 60).padStart(2, '0');
+    $('timer').textContent = `Slots hold hain: ${m}:${s}`;
+  }
+
+  async function load() {
+    const res = await fetch(`/api/reservations/${code}?t=${encodeURIComponent(t)}`);
+    const d = await res.json();
+    if (d.error) { $('sum').innerHTML = `<div class="err">${esc(d.error)}</div>`; return; }
+    if (d.status !== 'PENDING_PAYMENT') { location.href = ticketUrl; return; }
+    left = d.seconds_to_pay;
+    $('sum').innerHTML = `
+      <h2>Order summary</h2>
+      <table>
+        <tr><td>Booking code</td><td><b>${esc(d.code)}</b></td></tr>
+        <tr><td>Lot</td><td>${esc(d.lot_name)}</td></tr>
+        <tr><td>Slots</td><td>${d.slots} (${d.bays.map(esc).join(', ')})</td></tr>
+        <tr><td>Hold</td><td>${d.hold_minutes} minute</td></tr>
+        <tr><td>Amount</td><td><b>₹${d.amount}</b></td></tr>
+      </table>
+      <div style="margin-top:10px"><span class="pill warn" id="timer"></span></div>`;
+    $('payBtn').textContent = 'Pay ₹' + d.amount;
+    $('payBox').hidden = false;
+    tick(); left++;
+    timer = setInterval(tick, 1000);
+  }
+
+  function setMethod(m) {
+    method = m;
+    $('upiForm').hidden = m !== 'UPI';
+    $('cardForm').hidden = m !== 'CARD';
+    $('tabUpi').className = 'btn ' + (m === 'UPI' ? 'active' : 'ghost');
+    $('tabCard').className = 'btn ' + (m === 'CARD' ? 'active' : 'ghost');
+  }
+  $('tabUpi').addEventListener('click', () => setMethod('UPI'));
+  $('tabCard').addEventListener('click', () => setMethod('CARD'));
+
+  $('payBtn').addEventListener('click', async () => {
+    $('err').textContent = '';
+    const body = {t, method};
+    if (method === 'UPI') body.upi_id = $('upi').value;
+    else { body.card_number = $('card').value; body.cvv = $('cvv').value; }
+    $('overlay').hidden = false;
+    await new Promise(r => setTimeout(r, 1500));
+    try {
+      const res = await fetch(`/api/reservations/${code}/pay`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
+      });
+      const d = await res.json();
+      $('overlay').hidden = true;
+      if (d.error) { $('err').textContent = d.error; return; }
+      location.href = ticketUrl;
+    } catch (e) {
+      $('overlay').hidden = true;
+      $('err').textContent = 'Network error, dobara try karo';
+    }
+  });
+
+  load();
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkAI · Reservations &amp; Security</title>
+<link rel="stylesheet" href="/static/ui.css">
+</head>
+<body>
+<div class="top"><div class="in">
+  <div class="brand"><div class="logo">P</div>Admin · Reservations &amp; Security</div>
+  <div><a href="/admin">Dashboard</a><a href="/">Home</a></div>
+</div></div>
+
+<div class="wrap wide">
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card">
+    <h2>Security alerts</h2>
+    <div id="alerts" class="muted">Loading...</div>
+  </div>
+
+  <div class="card">
+    <h2>Reservations</h2>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Code</th><th>Lot</th><th>User</th><th>Slots</th><th>Bays</th><th>Amount</th><th>Status</th><th>Valid till</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const PILL = {PENDING_PAYMENT:'warn', CONFIRMED:'ok', CHECKED_IN:'info', CANCELLED:'gray', EXPIRED:'gray', NO_SHOW:'bad', LOCKED:'bad'};
+
+  async function load() {
+    const [a, b] = await Promise.all([
+      fetch('/api/admin/reservations').then(r => r.json()),
+      fetch('/api/admin/alerts').then(r => r.json())
+    ]);
+    const s = a.summary;
+    $('kpis').innerHTML = [['Net revenue', '₹' + s.revenue], ['Confirmed', s.confirmed], ['Payment pending', s.pending],
+      ['Checked in', s.checked_in], ['No-shows', s.no_show], ['Alerts', b.length]]
+      .map(([k, v]) => `<div class="kpi"><span class="muted">${k}</span><b>${v}</b></div>`).join('');
+
+    $('alerts').innerHTML = b.length ? b.map(x => `<div class="alert ${esc(x.severity)}">
+        <b>${esc(x.type)}</b> · ${esc(x.operator || '-')} ${x.code ? '· ' + esc(x.code) : ''}
+        <div class="muted">${esc(x.detail)} · ${esc(x.ts)}</div></div>`).join('') : 'Koi alert nahi. Sab theek hai.';
+
+    $('rows').innerHTML = a.items.map(r => `<tr>
+        <td><b>${esc(r.code)}</b></td><td>${esc(r.lot_name)}</td>
+        <td>${esc(r.user_name)}<div class="muted">${esc(r.phone)}</div></td>
+        <td>${r.slots}</td><td>${r.bays.map(esc).join(', ')}</td><td>₹${r.amount}</td>
+        <td><span class="pill ${PILL[r.status] || 'gray'}">${esc(r.status)}</span></td>
+        <td>${esc(r.expires_at || '-')}</td>
+        <td>${['PENDING_PAYMENT', 'CONFIRMED', 'LOCKED'].includes(r.status)
+          ? `<button class="btn bad sm" onclick="cancelRes('${esc(r.code)}')">Cancel</button>` : ''}</td>
+      </tr>`).join('');
+  }
+
+  async function cancelRes(code) {
+    const reason = prompt('Cancel karne ka reason?');
+    if (reason === null) return;
+    await fetch(`/api/admin/reservations/${code}/cancel`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({reason})
+    });
+    load();
+  }
+
+  load();
+  setInterval(load, 5000);
+</script>
+</body>
+</html>

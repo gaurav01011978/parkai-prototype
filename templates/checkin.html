@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkAI · Reserved Check-in</title>
+<link rel="stylesheet" href="/static/ui.css">
+</head>
+<body>
+<div class="top"><div class="in">
+  <div class="brand"><div class="logo">P</div>Reserved Check-in</div>
+  <div><a href="/operator">Operator console</a></div>
+</div></div>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Operator login</h2>
+    <div class="row">
+      <div><label>Operator ID</label><input id="opid" placeholder="Op-12"></div>
+      <div><label>PIN</label><input id="pin" type="password" inputmode="numeric" placeholder="****"></div>
+    </div>
+    <p class="muted">Demo: Op-12 / 1234 (Lot A), Op-07 / 5678 (Lot B), Op-03 / 9012 (Lot C)</p>
+  </div>
+
+  <div class="card">
+    <h2>Driver ki booking</h2>
+    <label>Booking code</label><input id="code" placeholder="PK-XXXXXX" style="text-transform:uppercase">
+    <label>Driver ka OTP (6 digit)</label><input id="otp" inputmode="numeric" maxlength="6" placeholder="------">
+    <button class="btn ok full" id="go" style="margin-top:14px">Verify &amp; Check-in</button>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card" id="okBox" hidden></div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  try { $('opid').value = sessionStorage.getItem('parkai_op') || ''; } catch (e) {}
+
+  $('go').addEventListener('click', async () => {
+    $('err').textContent = ''; $('okBox').hidden = true; $('go').disabled = true;
+    try { sessionStorage.setItem('parkai_op', $('opid').value); } catch (e) {}
+    try {
+      const res = await fetch('/api/checkin', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({operator_id: $('opid').value, pin: $('pin').value, code: $('code').value, otp: $('otp').value})
+      });
+      const d = await res.json();
+      if (d.error) { $('err').textContent = d.error; }
+      else {
+        $('okBox').hidden = false;
+        $('okBox').innerHTML = `<h2 style="color:var(--ok)">✓ Check-in ho gaya</h2>
+          <p><b>${esc(d.user_name)}</b> ${esc(d.vehicle_no)}</p>
+          <p>${d.slots} slot(s) allowed</p>
+          <div class="chips">${d.bays.map(b => `<span class="chip">${esc(b)}</span>`).join('')}</div>`;
+        $('code').value = ''; $('otp').value = '';
+      }
+    } catch (e) { $('err').textContent = 'Server se connect nahi ho paaya'; }
+    $('go').disabled = false;
+  });
+</script>
+</body>
+</html>

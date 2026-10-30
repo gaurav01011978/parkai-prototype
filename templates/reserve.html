@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkAI · Reserve Slots</title>
+<link rel="stylesheet" href="/static/ui.css">
+</head>
+<body>
+<div class="top"><div class="in">
+  <div class="brand"><div class="logo">P</div>Reserve Slots</div>
+  <div><a href="/user">Find parking</a></div>
+</div></div>
+
+<div class="wrap">
+  <div class="card">
+    <h2>1. Kahan aur kitne slots?</h2>
+    <label>Parking lot</label>
+    <select id="lot"></select>
+    <div class="muted" id="availNote"></div>
+
+    <label>Kitne slots chahiye?</label>
+    <div class="stepper">
+      <button type="button" id="minus">-</button>
+      <input id="slots" type="number" value="1" readonly>
+      <button type="button" id="plus">+</button>
+    </div>
+
+    <label>Kitni der ke liye hold karein?</label>
+    <select id="hold"></select>
+  </div>
+
+  <div class="card">
+    <h2>2. Aapki details</h2>
+    <label>Naam</label><input id="uname" placeholder="Gaurav Kumar">
+    <label>Phone (10 digit)</label><input id="phone" inputmode="numeric" maxlength="10" placeholder="98XXXXXXXX">
+    <label>Vehicle number (optional)</label><input id="vehicle" placeholder="DL 01 AB 1234">
+  </div>
+
+  <div class="card">
+    <div class="muted">Total fee</div>
+    <div class="big" id="amt">₹0</div>
+    <div class="muted" id="rateNote"></div>
+    <button class="btn full" id="go" style="margin-top:12px">Pay &amp; Reserve</button>
+    <div class="err" id="err"></div>
+  </div>
+
+  <div class="card" id="mine" hidden>
+    <h2>Meri recent bookings</h2>
+    <div id="mineList"></div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let cfg = {rate: 20, hold_options: [30, 60], max_slots: 10, pay_window_min: 5};
+  let lots = [];
+  const wanted = new URLSearchParams(location.search).get('lot');
+
+  function calc() {
+    const slots = Number($('slots').value), hold = Number($('hold').value || 30);
+    $('amt').textContent = '₹' + (slots * (hold / 30) * cfg.rate);
+    const lot = lots.find(l => String(l.id) === $('lot').value);
+    $('availNote').textContent = lot ? `${lot.free} slots available (${lot.reserved} pehle se reserved)` : '';
+  }
+
+  async function loadLots() {
+    const res = await fetch('/api/lots');
+    lots = await res.json();
+    const sel = $('lot'), prev = sel.value;
+    sel.innerHTML = lots.map(l => `<option value="${l.id}">${esc(l.name)} · ${l.free} available</option>`).join('');
+    sel.value = prev || wanted || (lots[0] && lots[0].id);
+    calc();
+  }
+
+  function renderMine() {
+    try {
+      const list = JSON.parse(localStorage.getItem('parkai_bookings') || '[]').slice(-5).reverse();
+      if (!list.length) return;
+      $('mine').hidden = false;
+      $('mineList').innerHTML = list.map(b =>
+        `<div style="margin:6px 0"><a href="/ticket/${b.code}?t=${encodeURIComponent(b.token)}">${esc(b.code)}</a></div>`).join('');
+    } catch (e) {}
+  }
+
+  function saveMine(d) {
+    try {
+      const list = JSON.parse(localStorage.getItem('parkai_bookings') || '[]');
+      list.push({code: d.code, token: d.token});
+      localStorage.setItem('parkai_bookings', JSON.stringify(list));
+    } catch (e) {}
+  }
+
+  $('minus').addEventListener('click', () => { $('slots').value = Math.max(1, Number($('slots').value) - 1); calc(); });
+  $('plus').addEventListener('click', () => { $('slots').value = Math.min(cfg.max_slots, Number($('slots').value) + 1); calc(); });
+  $('lot').addEventListener('change', calc);
+  $('hold').addEventListener('change', calc);
+
+  $('go').addEventListener('click', async () => {
+    $('err').textContent = '';
+    $('go').disabled = true;
+    try {
+      const res = await fetch('/api/reservations', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          lot_id: Number($('lot').value), slots: Number($('slots').value),
+          hold_minutes: Number($('hold').value), user_name: $('uname').value,
+          phone: $('phone').value, vehicle_no: $('vehicle').value
+        })
+      });
+      const d = await res.json();
+      if (d.error) { $('err').textContent = d.error; $('go').disabled = false; loadLots(); return; }
+      saveMine(d);
+      location.href = d.pay_url;
+    } catch (e) {
+      $('err').textContent = 'Server se connect nahi ho paaya';
+      $('go').disabled = false;
+    }
+  });
+
+  (async function init() {
+    try { cfg = await (await fetch('/api/reservations/config')).json(); } catch (e) {}
+    $('hold').innerHTML = cfg.hold_options.map(m => `<option value="${m}">${m} minute</option>`).join('');
+    $('rateNote').textContent = `₹${cfg.rate} per slot per 30 min. Booking ke baad ${cfg.pay_window_min} minute me payment karni hogi.`;
+    await loadLots();
+    renderMine();
+    setInterval(loadLots, 8000);
+  })();
+</script>
+</body>
+</html>

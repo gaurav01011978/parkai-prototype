@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkAI · My Ticket</title>
+<link rel="stylesheet" href="/static/ui.css">
+</head>
+<body>
+<div class="top"><div class="in">
+  <div class="brand"><div class="logo">P</div>My Parking Ticket</div>
+  <div><a href="/user">Find parking</a></div>
+</div></div>
+<div class="wrap" id="box">Loading...</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const code = location.pathname.split('/').pop();
+  const t = new URLSearchParams(location.search).get('t') || '';
+  const ST = {
+    PENDING_PAYMENT: ['warn', 'Payment pending'], CONFIRMED: ['ok', 'Confirmed'],
+    CHECKED_IN: ['info', 'Checked in'], CANCELLED: ['gray', 'Cancelled'], EXPIRED: ['gray', 'Expired'],
+    NO_SHOW: ['bad', 'No-show'], LOCKED: ['bad', 'Locked: admin se contact karo']
+  };
+  let left = null, timer = null;
+
+  function fmtLeft() {
+    if (left === null) return '';
+    if (left <= 0) return 'Time khatam';
+    const m = String(Math.floor(left / 60)).padStart(2, '0'), s = String(left % 60).padStart(2, '0');
+    return `Pahunchne ka time bacha: ${m}:${s}`;
+  }
+
+  function render(d) {
+    const [cls, label] = ST[d.status] || ['gray', d.status];
+    left = d.seconds_to_expiry;
+    let h = `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div class="muted">Booking code</div><div class="big">${esc(d.code)}</div></div>
+        <span class="pill ${cls}">${esc(label)}</span>
+      </div>`;
+
+    if (d.status === 'CONFIRMED') {
+      h += `<div class="otpbox"><div class="muted" style="color:#cbd5e1">Gate OTP (sirf operator ko, gate par)</div>
+            <div class="big">${esc(d.otp)}</div></div>
+            <div class="muted" id="cd"></div>
+            <p class="muted"><b>Zaroori:</b> Ye page ya OTP kisi ko pehle mat dikhao ya bhejo. Operator ko sirf gate par Code + OTP batao.</p>`;
+    }
+    if (d.status === 'PENDING_PAYMENT') {
+      h += `<p class="muted">Payment baaki hai.</p>
+            <a class="btn ok full" href="/pay/${esc(d.code)}?t=${encodeURIComponent(t)}">Pay ₹${d.amount}</a>`;
+    }
+    if (d.status === 'CHECKED_IN') h += `<p class="muted">Entry ho gayi: ${esc(d.checkin_at)}</p>`;
+    if (d.status === 'CANCELLED') h += `<p class="muted">Refund: ₹${d.refund_amount}. ${esc(d.cancel_reason)}</p>`;
+    if (d.status === 'NO_SHOW' || d.status === 'EXPIRED') h += `<p class="muted">Slots release ho chuke hain.</p>`;
+
+    h += `<table style="margin-top:10px">
+      <tr><td>Lot</td><td>${esc(d.lot_name)}</td></tr>
+      <tr><td>Slots</td><td>${d.slots}</td></tr>
+      <tr><td>Name</td><td>${esc(d.user_name)} ${esc(d.vehicle_no)}</td></tr>
+      <tr><td>Amount</td><td>₹${d.amount} ${d.payment_ref ? '(' + esc(d.payment_ref) + ')' : ''}</td></tr>
+      <tr><td>Valid till</td><td>${esc(d.expires_at || '-')}</td></tr>
+    </table>
+    <div class="chips">${d.bays.map(b => `<span class="chip">${esc(b)}</span>`).join('')}</div>`;
+
+    if (d.status === 'CONFIRMED' || d.status === 'PENDING_PAYMENT') {
+      h += `<button class="btn bad full" id="cancelBtn" style="margin-top:14px">Cancel booking</button>
+            <div class="muted" style="margin-top:6px">Confirmed booking cancel karne par 20% fee katti hai.</div>`;
+    }
+    h += `<div class="err" id="err"></div></div>`;
+    $('box').innerHTML = h;
+    if ($('cancelBtn')) $('cancelBtn').addEventListener('click', cancelRes);
+    if ($('cd')) $('cd').textContent = fmtLeft();
+  }
+
+  async function load() {
+    const res = await fetch(`/api/reservations/${code}?t=${encodeURIComponent(t)}`);
+    const d = await res.json();
+    if (d.error) { $('box').innerHTML = `<div class="card"><div class="err">${esc(d.error)}</div></div>`; return; }
+    render(d);
+  }
+
+  async function cancelRes() {
+    if (!confirm('Booking cancel karni hai?')) return;
+    const res = await fetch(`/api/reservations/${code}/cancel`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({t})
+    });
+    const d = await res.json();
+    if (d.error) { $('err').textContent = d.error; return; }
+    load();
+  }
+
+  setInterval(() => { if (left !== null) { left--; if ($('cd')) $('cd').textContent = fmtLeft(); } }, 1000);
+  load();
+  setInterval(load, 5000);
+</script>
+</body>
+</html>

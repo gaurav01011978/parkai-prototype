@@ -227,6 +227,20 @@
             filter: brightness(0.93);
         }
 
+        .rsv {
+            display: block;
+            margin-top: 10px;
+            padding: 13px 12px;
+            border: 2px solid #168751;
+            border-radius: 11px;
+            background: white;
+            color: #168751;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            text-decoration: none;
+        }
+
         footer {
             max-width: 1000px;
             margin: 20px auto 0;
@@ -386,7 +400,8 @@
           <div class="stat"><strong>${lot.predicted_occupancy}%</strong><span>Predicted full</span></div>
           <div class="stat"><strong>${lot.distance_m} m</strong><span>From destination</span></div>
         </div>
-        <button>Select Lot</button>`;
+        <button>SELECT</button>
+        <a class="rsv" href="/reserve?lot=${lot.id}">Reserve slots</a>`;
                 card.querySelector('button').addEventListener('click', () =>
                     selectLot(lot.name, lot.free, lot.distance_m));
                 if (lot.name === selectedName) {
