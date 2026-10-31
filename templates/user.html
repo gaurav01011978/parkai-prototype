@@ -402,7 +402,8 @@
           <div class="stat"><strong>${lot.distance_m} m</strong><span>From destination</span></div>
         </div>
         <button>SELECT</button>
-        <a class="rsv" href="/reserve?lot=${lot.id}">Reserve slots</a>`;
+        <a class="rsv" href="/reserve?lot=${lot.id}">Reserve slots</a>
+        <a class="rsv" href="/advance?lot=${lot.id}">Advance reserve (up to 5 days)</a>`;
                 card.querySelector('button').addEventListener('click', () =>
     window.parkaiSelect ? window.parkaiSelect(lot) : selectLot(lot.name, lot.free, lot.distance_m));
                 if (lot.name === selectedName) {

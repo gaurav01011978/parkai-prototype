@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkAI · Advance Reservation</title>
+<link rel="stylesheet" href="/static/ui.css">
+<style>
+  /* sirf advance page ke chhote extras (baaki sab /static/ui.css se) */
+  .quote{margin-top:12px;padding:12px 14px;border-radius:12px;background:#eff6ff;font-size:14px}
+  .quote.bad{background:#fee2e2;color:#991b1b;font-weight:700}
+  .tiers{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .res{border:2px solid var(--line);border-radius:14px;padding:12px;margin-top:12px}
+  .res .hd{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .note{margin-top:10px;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:600}
+  .note.ok{background:#dcfce7;color:#166534}.note.info{background:#dbeafe;color:#1e40af}
+  .note.warn{background:#fef3c7;color:#92400e}.note.bad{background:#fee2e2;color:#991b1b}
+  .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .box{margin-top:12px;padding:12px;border:2px dashed var(--line);border-radius:12px}
+  .tabs{margin-top:6px}
+</style>
+</head>
+<body>
+<div class="top"><div class="in">
+  <div class="brand"><div class="logo">P</div>Advance Reservation</div>
+  <div><a href="/user">Find parking</a><a href="/reserve">Reserve now</a></div>
+</div></div>
+
+<div class="wrap">
+  <div class="card">
+    <h2>1. Kahan aur kab?</h2>
+    <label>Parking lot</label>
+    <select id="lot"></select>
+    <div class="muted" id="availNote"></div>
+
+    <label>Date</label>
+    <input type="date" id="date">
+    <div class="row">
+      <div><label>From (start time)</label><input type="time" id="from"></div>
+      <div><label>To (end time)</label><input type="time" id="to"></div>
+    </div>
+    <div class="quote" id="quote" hidden></div>
+    <div class="tiers" id="tiers"></div>
+  </div>
+
+  <div class="card">
+    <h2>2. Aapki details</h2>
+    <label>Naam</label><input id="uname" placeholder="Gaurav Kumar">
+    <label>Phone (10 digit)</label><input id="phone" inputmode="numeric" maxlength="10" placeholder="98XXXXXXXX">
+    <label>Vehicle number (optional)</label><input id="vehicle" placeholder="DL 01 AB 1234">
+  </div>
+
+  <div class="card">
+    <h2>3. Payment</h2>
+    <div class="muted">Reservation charge (per booking, per ghanta nahi)</div>
+    <div class="big" id="amt">₹0</div>
+    <div class="muted" id="amtNote">Date aur time chuno, price yahan dikhega.</div>
+    <div id="payHolder"></div>
+    <button class="btn ok full" id="go" style="margin-top:14px" disabled>Pay &amp; Confirm</button>
+    <div class="err" id="err"></div>
+    <p class="muted">Demo gateway: koi bhi <b>name@upi</b> pass hoga. <b>fail@upi</b> ya <b>0000</b> par khatam hone wala card decline hoga. Asli paise nahi kat te.</p>
+  </div>
+
+  <div class="card">
+    <h2>Meri advance reservations</h2>
+    <div id="mine"><div class="muted">Abhi koi advance booking nahi hai.</div></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" hidden>Bank se baat ho rahi hai...</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const KEY = 'parkai_adv';
+  const getStore = () => { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } };
+  const setStore = v => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} };
+  const tokenOf = code => (getStore().find(x => x.code === code) || {}).token || '';
+  const wanted = new URLSearchParams(location.search).get('lot');
+  const pad = n => String(n).padStart(2, '0');
+  const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  let CFG = { tiers: [], max_days: 5, cancel_fee_pct: 20 };
+  let lots = [], quoteOk = false;
+
+  async function api(url, method = 'GET', body) {
+    const r = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined });
+    let j = {}; try { j = await r.json(); } catch (e) {}
+    return { ok: r.ok, status: r.status, data: j };
+  }
+  const bankDelay = async () => { $('overlay').hidden = false; await new Promise(r => setTimeout(r, 1500)); };
+
+  // ---------- payment block (pay.html jaisa: UPI / Card tabs, wahi demo gateway) ----------
+  const methods = {};
+  function payHTML(p) {
+    methods[p] = 'UPI';
+    return `<div class="row tabs">
+        <button class="btn active" id="${p}tabUpi" type="button" onclick="setMethod('${p}','UPI')">UPI</button>
+        <button class="btn ghost" id="${p}tabCard" type="button" onclick="setMethod('${p}','CARD')">Card</button>
+      </div>
+      <div id="${p}upiForm"><label>UPI ID</label><input id="${p}upi" placeholder="name@upi"></div>
+      <div id="${p}cardForm" hidden>
+        <label>Card number</label><input id="${p}card" inputmode="numeric" maxlength="19" placeholder="1234 5678 9012 3456">
+        <div class="row">
+          <div><label>Expiry</label><input id="${p}exp" placeholder="MM/YY"></div>
+          <div><label>CVV</label><input id="${p}cvv" inputmode="numeric" maxlength="3" placeholder="123"></div>
+        </div>
+      </div>`;
+  }
+  function setMethod(p, m) {
+    methods[p] = m;
+    $(p + 'upiForm').hidden = m !== 'UPI';
+    $(p + 'cardForm').hidden = m !== 'CARD';
+    $(p + 'tabUpi').className = 'btn ' + (m === 'UPI' ? 'active' : 'ghost');
+    $(p + 'tabCard').className = 'btn ' + (m === 'CARD' ? 'active' : 'ghost');
+  }
+  function payData(p) {
+    return methods[p] === 'UPI' ? { method: 'UPI', upi_id: $(p + 'upi').value }
+                                : { method: 'CARD', card_number: $(p + 'card').value, cvv: $(p + 'cvv').value };
+  }
+  $('payHolder').innerHTML = payHTML('b_');
+
+  // ---------- form ----------
+  function lotNote() {
+    const l = lots.find(x => String(x.id) === $('lot').value);
+    $('availNote').textContent = l ? `Abhi live: ${l.free} slots free (capacity ${l.capacity}). Advance booking poore time-interval ke hisaab se check hoti hai.` : '';
+  }
+  async function loadLots() {
+    const r = await api('/api/lots');
+    lots = r.data || [];
+    const sel = $('lot'), prev = sel.value;
+    sel.innerHTML = lots.map(l => `<option value="${l.id}">${esc(l.name)} · ${l.free} free now</option>`).join('');
+    sel.value = prev || wanted || (lots[0] && lots[0].id);
+    lotNote();
+  }
+  async function init() {
+    const cfg = await api('/api/advance/config');
+    if (cfg.ok) CFG = cfg.data;
+    $('tiers').innerHTML = CFG.tiers.map(t => `<span class="pill info">₹${t.price} · ${esc(t.label)}</span>`).join('');
+    const today = new Date(), max = new Date(Date.now() + CFG.max_days * 86400000);
+    $('date').min = iso(today); $('date').max = iso(max); $('date').value = iso(today);
+    await loadLots();
+    loadMine();
+    setInterval(loadLots, 15000);
+  }
+  ['lot', 'date', 'from', 'to'].forEach(id => $(id).addEventListener('change', () => { lotNote(); refreshQuote(); }));
+
+  async function refreshQuote() {
+    const q = $('quote'); quoteOk = false; $('go').disabled = true; $('err').textContent = '';
+    if (!$('date').value || !$('from').value || !$('to').value) { q.hidden = true; return; }
+    const qs = new URLSearchParams({ lot_id: $('lot').value, date: $('date').value, start_time: $('from').value, end_time: $('to').value });
+    const r = await api('/api/advance/quote?' + qs);
+    q.hidden = false; q.className = 'quote';
+    if (!r.ok) { q.className = 'quote bad'; q.textContent = r.data.error || 'Error'; $('amt').textContent = '₹0'; return; }
+    const d = r.data;
+    if (!d.available) { q.className = 'quote bad'; q.textContent = d.message; $('amt').textContent = '₹0'; return; }
+    q.innerHTML = `<b>${esc($('date').value)}</b> · ${esc($('from').value)} → ${esc($('to').value)} (${d.duration_min} min)<br>
+      Is poore interval me <b>${d.free_slots}</b> slots available hain.`;
+    $('amt').textContent = '₹' + d.price;
+    $('amtNote').textContent = d.tier + ' · booking confirm hone ke baad ye price badalta nahi.';
+    quoteOk = true; $('go').disabled = false;
+  }
+
+  $('go').addEventListener('click', async () => {
+    $('err').textContent = ''; $('go').disabled = true;
+    const body = { lot_id: Number($('lot').value), date: $('date').value, start_time: $('from').value, end_time: $('to').value,
+      user_name: $('uname').value, phone: $('phone').value, vehicle_no: $('vehicle').value, ...payData('b_') };
+    await bankDelay();
+    let r;
+    try { r = await api('/api/advance/book', 'POST', body); }
+    catch (e) { $('overlay').hidden = true; $('err').textContent = 'Server se connect nahi ho paaya'; $('go').disabled = false; return; }
+    $('overlay').hidden = true;
+    if (!r.ok) { $('err').textContent = r.data.error || 'Error'; refreshQuote(); loadLots(); return; }
+    const s = getStore(); s.push({ code: r.data.code, token: r.data.token }); setStore(s);
+    const b = r.data.booking;
+    loadMine(); refreshQuote(); loadLots();   // refreshQuote pehle chalao, taaki neeche ka message clear na ho
+    $('err').innerHTML = `<span style="color:var(--ok)">✅ Booking confirmed! Code ${esc(b.code)} · ${esc(b.lot_name)} · ${esc(b.date)} · ${esc(b.start)}–${esc(b.end)} · ₹${b.amount}</span>`;
+  });
+
+  // ---------- my reservations ----------
+  async function loadMine() {
+    const items = getStore();
+    if (!items.length) return;
+    const r = await api('/api/advance/mine', 'POST', { items });
+    if (r.ok) render(r.data);
+  }
+  function render(list) {
+    $('mine').innerHTML = list.length ? list.map(card).join('') : '<div class="muted">Abhi koi advance booking nahi hai.</div>';
+  }
+  function card(b) {
+    const pill = { CONFIRMED: 'ok', CANCELLED: 'gray', COMPLETED: 'gray' }[b.status] || 'gray';
+    let earlyPill = '';
+    if (b.early_status === 'WAITING') earlyPill = ` <span class="pill warn">Waiting${b.queue_position ? ' #' + b.queue_position : ''}</span>`;
+    else if (b.early_status === 'ARRIVED_SAME') earlyPill = ' <span class="pill info">Early parking</span>';
+    else if (b.early_status === 'TRANSFERRED') earlyPill = ' <span class="pill info">Shifted lot</span>';
+    const noteCls = b.early_status === 'WAITING' ? 'warn' : 'ok';
+    const note = b.early_message ? `<div class="note ${noteCls}">${esc(b.early_message)}${b.queue_position ? `<br>Queue position: #${b.queue_position} (pehle aao, pehle pao)` : ''}</div>` : '';
+    const moved = b.original_lot_id !== b.lot_id ? `<tr><td>Original lot</td><td>${esc(b.original_lot_name)} → <b>${esc(b.lot_name)}</b></td></tr>` : '';
+    const early = b.booked_start !== b.start ? ` <span class="muted">(booked: ${esc(b.booked_start)})</span>` : '';
+    const refund = b.refund_amount ? `<tr><td>Refund</td><td>₹${b.refund_amount}</td></tr>` : '';
+    let acts = '';
+    if (b.can_early) acts += `<button class="btn ok sm" onclick="early('${esc(b.code)}')">I'm Here Early</button>`;
+    if (b.early_status === 'WAITING') acts += `<button class="btn ghost sm" onclick="leaveQueue('${esc(b.code)}')">Leave queue</button>`;
+    if (b.can_modify) acts += `<button class="btn ghost sm" onclick="toggleBox('mod_${esc(b.code)}')">Change time</button>`;
+    if (b.can_cancel) acts += `<button class="btn bad sm" onclick="cancelB('${esc(b.code)}')">Cancel</button>`;
+    const modBox = b.can_modify ? `<div class="box" id="mod_${esc(b.code)}" data-open="0" hidden>
+        <label>New date</label><input type="date" id="md_${esc(b.code)}" value="${esc(b.date)}" min="${iso(new Date())}">
+        <div class="row">
+          <div><label>From</label><input type="time" id="mf_${esc(b.code)}" value="${esc(b.start)}"></div>
+          <div><label>To</label><input type="time" id="mt_${esc(b.code)}" value="${esc(b.end)}"></div>
+        </div>
+        <div class="acts"><button class="btn ghost sm" onclick="modPreview('${esc(b.code)}')">Check new price</button></div>
+        <div id="mr_${esc(b.code)}"></div></div>` : '';
+    return `<div class="res">
+      <div class="hd"><div><div class="muted">Booking code</div><b style="font-size:18px;letter-spacing:.05em">${esc(b.code)}</b></div>
+        <div><span class="pill ${pill}">${esc(b.status)}</span>${earlyPill}</div></div>
+      <table style="margin-top:8px">
+        <tr><td>Lot</td><td>${esc(b.lot_name)}</td></tr>${moved}
+        <tr><td>Date</td><td>${esc(b.date)}</td></tr>
+        <tr><td>From – To</td><td><b>${esc(b.start)}</b>${early} – <b>${esc(b.end)}</b></td></tr>
+        <tr><td>Name</td><td>${esc(b.user_name)} ${esc(b.vehicle_no)}</td></tr>
+        <tr><td>Charge</td><td>₹${b.amount} <span class="muted">(${esc(b.price_tier)})</span></td></tr>${refund}
+      </table>
+      ${note}<div id="em_${esc(b.code)}"></div>
+      <div class="acts">${acts}</div>${modBox}</div>`;
+  }
+  function toggleBox(id) { const b = $(id); b.hidden = !b.hidden; b.setAttribute('data-open', b.hidden ? '0' : '1'); }
+
+  async function cancelB(code) {
+    if (!confirm(`Booking cancel karni hai? ${CFG.cancel_fee_pct}% fee katti hai. Capacity turant free ho jayegi.`)) return;
+    const r = await api(`/api/advance/${code}/cancel`, 'POST', { t: tokenOf(code) });
+    if (!r.ok) { alert(r.data.error); } else { alert(`Booking cancel ho gayi. Refund: ₹${r.data.refund}`); }
+    loadMine(); loadLots(); refreshQuote();
+  }
+  async function early(code, join) {
+    const r = await api(`/api/advance/${code}/early`, 'POST', { t: tokenOf(code), join_queue: !!join });
+    const em = $('em_' + code);
+    if (!r.ok) { em.innerHTML = `<div class="note bad">${esc(r.data.error)}</div>`; return; }
+    if (r.data.outcome === 'NO_CAPACITY') {
+      em.innerHTML = `<div class="note warn">${esc(r.data.message)}<div class="acts"><button class="btn sm" onclick="early('${esc(code)}', true)">Join waiting queue</button></div></div>`;
+      return;
+    }
+    loadMine(); loadLots();
+  }
+  async function leaveQueue(code) { await api(`/api/advance/${code}/early/leave`, 'POST', { t: tokenOf(code) }); loadMine(); }
+
+  async function modPreview(code) {
+    const body = { t: tokenOf(code), date: $('md_' + code).value, start_time: $('mf_' + code).value, end_time: $('mt_' + code).value, preview: true };
+    const r = await api(`/api/advance/${code}/modify`, 'POST', body);
+    const out = $('mr_' + code);
+    if (!r.ok) { out.innerHTML = `<div class="note bad">${esc(r.data.error)}</div>`; return; }
+    const d = r.data;
+    const txt = d.difference > 0 ? `Extra payment: <b>₹${d.difference}</b>` : d.difference < 0 ? `Refund: <b>₹${-d.difference}</b>` : 'Price me koi change nahi';
+    out.innerHTML = `<div class="note info">Naya price: <b>₹${d.new_amount}</b> (${esc(d.tier)}) · purana ₹${d.old_amount}<br>${txt}</div>
+      ${d.difference > 0 ? payHTML('m_' + code + '_') : ''}
+      <div class="acts"><button class="btn sm" onclick="modConfirm('${esc(code)}', ${d.difference})">Confirm change</button></div>
+      <div class="err" id="me_${esc(code)}"></div>`;
+  }
+  async function modConfirm(code, diff) {
+    const body = { t: tokenOf(code), date: $('md_' + code).value, start_time: $('mf_' + code).value, end_time: $('mt_' + code).value };
+    if (diff > 0) { Object.assign(body, payData('m_' + code + '_')); await bankDelay(); }
+    const r = await api(`/api/advance/${code}/modify`, 'POST', body);
+    $('overlay').hidden = true;
+    if (!r.ok) { $('me_' + code).textContent = r.data.error || 'Error'; return; }
+    loadMine(); loadLots();
+  }
+
+  init();
+  setInterval(() => {   // waiting queue ka status auto-update (jab user change-time box bhar raha ho tab refresh nahi)
+    if (document.querySelector('.box[data-open="1"]')) return;
+    loadMine();
+  }, 10000);
+</script>
+</body>
+</html>

@@ -1,10 +1,12 @@
 from flask import Flask, jsonify, request, render_template
 from datetime import datetime
 from math import radians, sin, cos, asin, sqrt
+
 from database import (get_conn, get_tx_conn, tx_begin, tx_commit, tx_rollback, init_db,
                       expire_old, reserved_counts, log_event, now_str)
 from reservations import bp as reservations_bp
 from traffic_alternative import bp as traffic_bp
+from advance import bp as advance_bp, init_advance_db   # NEW: advance reservation + early arrival + pricing
 
 try:
     from predict import predict_occupancy
@@ -13,10 +15,11 @@ except Exception:
         return 50
 
 app = Flask(__name__)
-
 init_db()
+init_advance_db()   # NEW: safe migration (sirf naye tables banata hai)
 app.register_blueprint(reservations_bp)
 app.register_blueprint(traffic_bp)
+app.register_blueprint(advance_bp)   # NEW
 
 
 def distance_m(lat1, lng1, lat2, lng2):
@@ -122,7 +125,6 @@ def update():
     lot_id = data.get("lot_id")
     action = data.get("action")
     operator = data.get("operator", "Op-1")
-
     if action not in ("ENTRY", "EXIT"):
         return jsonify({"error": "action ENTRY ya EXIT hona chahiye"}), 400
 
@@ -134,10 +136,8 @@ def update():
         if lot is None:
             tx_rollback(conn)
             return jsonify({"error": "lot nahi mila"}), 404
-
         reserved = reserved_counts(conn).get(lot["id"], 0)
         count = lot["current_count"]
-
         if action == "ENTRY":
             if count >= lot["capacity"]:
                 tx_rollback(conn)
@@ -154,7 +154,6 @@ def update():
                 tx_rollback(conn)
                 return jsonify({"error": "Lot pehle se khaali hai"}), 400
             count -= 1
-
         now = now_str()
         conn.execute("UPDATE lots SET current_count=?, last_updated=? WHERE id=?", (count, now, lot["id"]))
         conn.execute("INSERT INTO logs (lot_id, action, operator, timestamp) VALUES (?,?,?,?)",
@@ -175,7 +174,6 @@ def update():
 def undo():
     data = request.get_json(silent=True) or {}
     lot_id = data.get("lot_id")
-
     conn = get_conn()
     log = conn.execute(
         "SELECT * FROM logs WHERE lot_id=? AND action IN ('ENTRY','EXIT') AND undone=0 ORDER BY id DESC LIMIT 1",
@@ -184,11 +182,9 @@ def undo():
     if log is None:
         conn.close()
         return jsonify({"error": "Undo karne ke liye kuch nahi hai"}), 400
-
     lot = conn.execute("SELECT * FROM lots WHERE id=?", (lot_id,)).fetchone()
     change = -1 if log["action"] == "ENTRY" else 1
     count = max(0, min(lot["capacity"], lot["current_count"] + change))
-
     now = now_str()
     conn.execute("UPDATE lots SET current_count=?, last_updated=? WHERE id=?", (count, now, lot_id))
     conn.execute("UPDATE logs SET undone=1 WHERE id=?", (log["id"],))
@@ -231,7 +227,6 @@ def recommend():
         lng = float(request.args.get("lng"))
     except (TypeError, ValueError):
         return jsonify({"error": "lat aur lng bhejo"}), 400
-
     hour_arg = request.args.get("hour")
     hour = int(hour_arg) if hour_arg else datetime.now().hour
 
@@ -256,16 +251,13 @@ def recommend():
         pred = predict_occupancy(r["id"], hour)
         dist = distance_m(lat, lng, r["lat"], r["lng"])
         dist_score = max(0, 1 - dist / 2000)
-
         score = 0.4 * free_pct + 0.35 * (1 - pred / 100) + 0.25 * dist_score
-
         results.append({
             "id": r["id"], "name": r["name"], "free": free, "reserved": reserved,
             "capacity": r["capacity"], "predicted_occupancy": pred,
             "distance_m": round(dist), "score": round(score, 3),
             "lat": r["lat"], "lng": r["lng"], "best": False,
         })
-
     results.sort(key=lambda x: x["score"], reverse=True)
     if results:
         results[0]["best"] = True
