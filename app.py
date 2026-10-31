@@ -7,6 +7,8 @@ from database import (get_conn, get_tx_conn, tx_begin, tx_commit, tx_rollback, i
 from reservations import bp as reservations_bp
 from traffic_alternative import bp as traffic_bp
 from advance import bp as advance_bp, init_advance_db   # NEW: advance reservation + early arrival + pricing
+from subscriptions import bp as subscriptions_bp, init_subscription_db   # NEW: subscription plans + payments
+from assistant import bp as assistant_bp, init_assistant_db              # NEW: AI parking assistant
 
 try:
     from predict import predict_occupancy
@@ -17,9 +19,13 @@ except Exception:
 app = Flask(__name__)
 init_db()
 init_advance_db()   # NEW: safe migration (sirf naye tables banata hai)
+init_subscription_db()   # NEW: safe migration
+init_assistant_db()      # NEW: safe migration
 app.register_blueprint(reservations_bp)
 app.register_blueprint(traffic_bp)
 app.register_blueprint(advance_bp)   # NEW
+app.register_blueprint(subscriptions_bp)   # NEW
+app.register_blueprint(assistant_bp)       # NEW
 
 
 def distance_m(lat1, lng1, lat2, lng2):

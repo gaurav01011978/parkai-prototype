@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ParkAI · Plans</title>
+<link rel="stylesheet" href="/static/ui.css">
+<style>
+  .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:14px}
+  .plan{background:var(--card);border-radius:18px;box-shadow:0 6px 24px rgba(15,23,42,.08);padding:18px;border:2px solid transparent;display:flex;flex-direction:column}
+  .plan.cur{border-color:var(--sign)}
+  .plan .price{font-size:30px;font-weight:800;margin:6px 0 2px}
+  .plan ul{padding-left:18px;margin:10px 0 14px;font-size:14px;flex:1}
+  .plan li{margin-bottom:6px}
+  .seg{display:inline-flex;background:#e2e8f0;border-radius:12px;padding:4px;margin-bottom:14px}
+  .seg button{border:0;background:transparent;padding:8px 16px;border-radius:9px;font:inherit;font-weight:700;cursor:pointer;color:var(--muted)}
+  .seg button.on{background:#fff;color:var(--text);box-shadow:0 2px 6px rgba(15,23,42,.1)}
+  .banner{padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;margin-bottom:14px}
+  .banner.warn{background:#fef3c7;color:#92400e}.banner.ok{background:#dcfce7;color:#166534}
+  .banner.bad{background:#fee2e2;color:#991b1b}.banner.info{background:#dbeafe;color:#1e40af}
+  .wrap.wide{max-width:1000px}
+</style>
+</head>
+<body>
+<div class="top"><div class="in">
+  <div class="brand"><div class="logo">P</div>ParkAI Plans</div>
+  <div><a href="/assistant">AI Assistant</a><a href="/user">Find parking</a><a href="/advance">Advance reserve</a></div>
+</div></div>
+
+<div class="wrap wide">
+  <div id="msg"></div>
+
+  <div class="card" id="mine" hidden></div>
+
+  <div class="card">
+    <h2>AI Assistant plans</h2>
+    <div class="muted">Manual parking search, recommendations and reservations are <b>always free</b>. Plans unlock the AI Assistant (chat). Payment uses the same demo gateway as Advance Reservation (no real money is charged).</div>
+  </div>
+
+  <div class="seg" id="seg">
+    <button data-b="monthly" class="on">Monthly</button>
+    <button data-b="yearly">Yearly</button>
+  </div>
+  <div class="plans" id="plans"></div>
+
+  <div class="card" id="buyForm" hidden>
+    <h2 id="buyTitle">Payment</h2>
+    <div class="muted" id="buySummary"></div>
+    <div id="newUser">
+      <label>Name</label><input id="bname" placeholder="Your name">
+      <label>Phone (10 digit)</label><input id="bphone" inputmode="numeric" maxlength="10" placeholder="98XXXXXXXX">
+      <label>Email (optional)</label><input id="bemail" type="email" placeholder="you@example.com">
+    </div>
+    <div class="row tabs" style="margin-top:14px">
+      <button class="btn active" id="tabUpi" type="button">UPI</button>
+      <button class="btn ghost" id="tabCard" type="button">Card</button>
+    </div>
+    <div id="upiForm"><label>UPI ID</label><input id="upi" placeholder="name@upi"></div>
+    <div id="cardForm" hidden>
+      <label>Card number</label><input id="card" inputmode="numeric" maxlength="19" placeholder="1234 5678 9012 3456">
+      <div class="row"><div><label>Expiry</label><input id="exp" placeholder="MM/YY"></div>
+      <div><label>CVV</label><input id="cvv" inputmode="numeric" maxlength="3" placeholder="123"></div></div>
+    </div>
+    <button class="btn ok full" id="bgo" style="margin-top:14px">Pay &amp; activate</button>
+    <div class="err" id="berr"></div>
+    <p class="muted">Demo gateway: any <b>name@upi</b> passes. <b>fail@upi</b>, or a card ending in <b>0000</b>, is declined. A declined payment never activates a plan.</p>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const KEY = 'parkai_sub';
+  const getSub = () => { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } };
+  const setSub = v => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) {} };
+  let PLANS = [], GW = {configured: false}, billing = 'monthly', current = null, pending = null;
+
+  async function api(url, method = 'GET', body) {
+    const r = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined });
+    let j = {}; try { j = await r.json(); } catch (e) {}
+    return { ok: r.ok, status: r.status, data: j };
+  }
+  const banner = (cls, text) => { $('msg').innerHTML = text ? `<div class="banner ${cls}">${esc(text)}</div>` : ''; };
+  const fmtDate = s => s ? new Date(s.replace(' ', 'T')).toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'}) : '';
+
+  async function loadMine() {
+    const s = getSub();
+    current = null;
+    if (s) {
+      const r = await api(`/api/subscriptions/${encodeURIComponent(s.code)}?t=${encodeURIComponent(s.token)}`);
+      if (r.ok) current = r.data;
+    }
+    const box = $('mine');
+    if (!current || current.status === 'NONE') { box.hidden = true; return; }
+    box.hidden = false;
+    const pill = {ACTIVE: 'ok', CANCELLED: 'warn', EXPIRED: 'bad'}[current.status] || 'gray';
+    const plan = current.plan ? current.plan.name : '';
+    let h = `<div class="row" style="align-items:center"><h2 style="margin:0">Your subscription</h2><div style="text-align:right"><span class="pill ${pill}">${esc(current.status)}</span></div></div>
+      <p><b>${esc(plan)}</b> · ${esc(current.billing || '')}${current.eligible ? ` · valid until <b>${esc(fmtDate(current.expires_at))}</b> (${current.days_left} days left)` : ` · expired ${esc(fmtDate(current.expires_at))}`}</p>`;
+    if (current.status === 'CANCELLED') h += `<div class="banner info">Renewal is off. You keep access until ${esc(fmtDate(current.expires_at))}.</div>`;
+    if (current.expiring_soon && current.status === 'ACTIVE') h += `<div class="banner warn">Expiring soon — renew to keep the AI Assistant.</div>`;
+    if (current.status === 'EXPIRED') h += `<div class="banner bad">Your plan has expired. Renew to use the AI Assistant again.</div>`;
+    h += `<div class="acts" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">`;
+    if (current.eligible) h += `<a class="btn" href="/assistant">Open AI Assistant</a>`;
+    if (current.status === 'ACTIVE') h += `<button class="btn bad sm" id="cancelSub">Cancel subscription</button>`;
+    h += `</div>`;
+    box.innerHTML = h;
+    if ($('cancelSub')) $('cancelSub').onclick = cancelSub;
+  }
+
+  function renderPlans() {
+    $('plans').innerHTML = PLANS.map(p => {
+      const price = billing === 'yearly' ? p.price_yearly : p.price_monthly;
+      const unit = billing === 'yearly' ? 'year' : 'month';
+      const isCur = current && current.eligible && current.plan && current.plan.id === p.id;
+      let label = 'Choose ' + p.name;
+      if (isCur) label = 'Renew ' + p.name;
+      else if (current && current.eligible) label = 'Switch to ' + p.name;
+      return `<div class="plan ${isCur ? 'cur' : ''}">
+        <div class="pill info" style="align-self:flex-start">${esc(p.name)}</div>
+        <div class="price">₹${price}<span class="muted" style="font-size:14px;font-weight:600"> / ${unit}</span></div>
+        <div class="muted">${esc(p.tagline || '')}</div>
+        <ul>${p.features.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
+        <button class="btn ${isCur ? 'ok' : ''} full" data-plan="${esc(p.id)}">${esc(label)}</button>
+      </div>`;
+    }).join('');
+    document.querySelectorAll('[data-plan]').forEach(b => b.onclick = () => choose(b.dataset.plan));
+  }
+
+  $('seg').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    billing = b.dataset.b;
+    $('seg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    renderPlans();
+  };
+
+  let method = 'UPI';
+  function setMethod(m) {
+    method = m;
+    $('upiForm').hidden = m !== 'UPI'; $('cardForm').hidden = m !== 'CARD';
+    $('tabUpi').className = 'btn ' + (m === 'UPI' ? 'active' : 'ghost');
+    $('tabCard').className = 'btn ' + (m === 'CARD' ? 'active' : 'ghost');
+  }
+  $('tabUpi').onclick = () => setMethod('UPI');
+  $('tabCard').onclick = () => setMethod('CARD');
+
+  function choose(planId) {
+    banner('', ''); $('berr').textContent = '';
+    pending = planId;
+    const p = PLANS.find(x => x.id === planId);
+    const price = billing === 'yearly' ? p.price_yearly : p.price_monthly;
+    $('buyTitle').textContent = `Pay for ${p.name} (${billing})`;
+    $('buySummary').textContent = `₹${price} per ${billing === 'yearly' ? 'year' : 'month'}.` +
+      (current && current.eligible ? (current.plan.id === p.id ? ' Renewing adds time after your current expiry.' : ' Switching starts the new plan now; remaining time on your current plan is not carried over.') : '');
+    $('newUser').hidden = !!(getSub() && current);
+    $('buyForm').hidden = false;
+    $('buyForm').scrollIntoView({behavior: 'smooth'});
+  }
+
+  $('bgo').onclick = async () => {
+    $('berr').textContent = ''; banner('', '');
+    const s = getSub();
+    const known = !$('newUser').hidden ? null : s;
+    const pay = method === 'UPI' ? {method: 'UPI', upi_id: $('upi').value}
+                                 : {method: 'CARD', card_number: $('card').value, cvv: $('cvv').value};
+    const body = {plan_id: pending, billing, ...pay,
+      ...(known ? {code: known.code, t: known.token} : {name: $('bname').value, phone: $('bphone').value, email: $('bemail').value})};
+    $('bgo').disabled = true; $('bgo').textContent = 'Contacting bank…';
+    await new Promise(r => setTimeout(r, 1200));
+    const r = await api('/api/subscriptions/checkout', 'POST', body);
+    $('bgo').disabled = false; $('bgo').textContent = 'Pay & activate';
+    if (!r.ok) { $('berr').textContent = r.data.error || 'Payment failed'; return; }
+    if (r.data.token) setSub({code: r.data.sub_code, token: r.data.token});
+    $('buyForm').hidden = true;
+    banner('ok', `Payment successful (ref ${r.data.payment_ref}) — ${r.data.subscription.plan.name} is active until ${fmtDate(r.data.subscription.expires_at)}.`);
+    await loadMine(); renderPlans();
+  };
+
+  async function cancelSub() {
+    if (!confirm('Cancel your subscription? You keep access until the expiry date; no refund is given.')) return;
+    const s = getSub();
+    const r = await api(`/api/subscriptions/${encodeURIComponent(s.code)}/cancel`, 'POST', {t: s.token});
+    banner(r.ok ? 'ok' : 'bad', r.ok ? r.data.message : (r.data.error || 'Could not cancel'));
+    await loadMine(); renderPlans();
+  }
+
+  (async function init() {
+    const r = await api('/api/subscriptions/plans');
+    if (r.ok) { PLANS = r.data.plans; GW = r.data.gateway; }
+    await loadMine();
+    renderPlans();
+  })();
+</script>
+</body>
+</html>

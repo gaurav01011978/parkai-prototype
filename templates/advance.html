@@ -23,16 +23,16 @@
 <body>
 <div class="top"><div class="in">
   <div class="brand"><div class="logo">P</div>Advance Reservation</div>
-  <div><a href="/user">Find parking</a><a href="/reserve">Reserve now</a></div>
+  <div><a href="/user">Find parking</a><a href="/reserve">Reserve now</a><a href="/assistant">AI Assistant</a></div>
 </div></div>
-
+ 
 <div class="wrap">
   <div class="card">
     <h2>1. Kahan aur kab?</h2>
     <label>Parking lot</label>
     <select id="lot"></select>
     <div class="muted" id="availNote"></div>
-
+ 
     <label>Date</label>
     <input type="date" id="date">
     <div class="row">
@@ -42,14 +42,14 @@
     <div class="quote" id="quote" hidden></div>
     <div class="tiers" id="tiers"></div>
   </div>
-
+ 
   <div class="card">
     <h2>2. Aapki details</h2>
     <label>Naam</label><input id="uname" placeholder="Gaurav Kumar">
     <label>Phone (10 digit)</label><input id="phone" inputmode="numeric" maxlength="10" placeholder="98XXXXXXXX">
     <label>Vehicle number (optional)</label><input id="vehicle" placeholder="DL 01 AB 1234">
   </div>
-
+ 
   <div class="card">
     <h2>3. Payment</h2>
     <div class="muted">Reservation charge (per booking, per ghanta nahi)</div>
@@ -60,15 +60,15 @@
     <div class="err" id="err"></div>
     <p class="muted">Demo gateway: koi bhi <b>name@upi</b> pass hoga. <b>fail@upi</b> ya <b>0000</b> par khatam hone wala card decline hoga. Asli paise nahi kat te.</p>
   </div>
-
+ 
   <div class="card">
     <h2>Meri advance reservations</h2>
     <div id="mine"><div class="muted">Abhi koi advance booking nahi hai.</div></div>
   </div>
 </div>
-
+ 
 <div class="overlay" id="overlay" hidden>Bank se baat ho rahi hai...</div>
-
+ 
 <script>
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -81,14 +81,14 @@
   const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   let CFG = { tiers: [], max_days: 5, cancel_fee_pct: 20 };
   let lots = [], quoteOk = false;
-
+ 
   async function api(url, method = 'GET', body) {
     const r = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined });
     let j = {}; try { j = await r.json(); } catch (e) {}
     return { ok: r.ok, status: r.status, data: j };
   }
   const bankDelay = async () => { $('overlay').hidden = false; await new Promise(r => setTimeout(r, 1500)); };
-
+ 
   // ---------- payment block (pay.html jaisa: UPI / Card tabs, wahi demo gateway) ----------
   const methods = {};
   function payHTML(p) {
@@ -118,7 +118,7 @@
                                 : { method: 'CARD', card_number: $(p + 'card').value, cvv: $(p + 'cvv').value };
   }
   $('payHolder').innerHTML = payHTML('b_');
-
+ 
   // ---------- form ----------
   function lotNote() {
     const l = lots.find(x => String(x.id) === $('lot').value);
@@ -143,7 +143,7 @@
     setInterval(loadLots, 15000);
   }
   ['lot', 'date', 'from', 'to'].forEach(id => $(id).addEventListener('change', () => { lotNote(); refreshQuote(); }));
-
+ 
   async function refreshQuote() {
     const q = $('quote'); quoteOk = false; $('go').disabled = true; $('err').textContent = '';
     if (!$('date').value || !$('from').value || !$('to').value) { q.hidden = true; return; }
@@ -159,7 +159,7 @@
     $('amtNote').textContent = d.tier + ' · booking confirm hone ke baad ye price badalta nahi.';
     quoteOk = true; $('go').disabled = false;
   }
-
+ 
   $('go').addEventListener('click', async () => {
     $('err').textContent = ''; $('go').disabled = true;
     const body = { lot_id: Number($('lot').value), date: $('date').value, start_time: $('from').value, end_time: $('to').value,
@@ -175,7 +175,7 @@
     loadMine(); refreshQuote(); loadLots();   // refreshQuote pehle chalao, taaki neeche ka message clear na ho
     $('err').innerHTML = `<span style="color:var(--ok)">✅ Booking confirmed! Code ${esc(b.code)} · ${esc(b.lot_name)} · ${esc(b.date)} · ${esc(b.start)}–${esc(b.end)} · ₹${b.amount}</span>`;
   });
-
+ 
   // ---------- my reservations ----------
   async function loadMine() {
     const items = getStore();
@@ -224,7 +224,7 @@
       <div class="acts">${acts}</div>${modBox}</div>`;
   }
   function toggleBox(id) { const b = $(id); b.hidden = !b.hidden; b.setAttribute('data-open', b.hidden ? '0' : '1'); }
-
+ 
   async function cancelB(code) {
     if (!confirm(`Booking cancel karni hai? ${CFG.cancel_fee_pct}% fee katti hai. Capacity turant free ho jayegi.`)) return;
     const r = await api(`/api/advance/${code}/cancel`, 'POST', { t: tokenOf(code) });
@@ -242,7 +242,7 @@
     loadMine(); loadLots();
   }
   async function leaveQueue(code) { await api(`/api/advance/${code}/early/leave`, 'POST', { t: tokenOf(code) }); loadMine(); }
-
+ 
   async function modPreview(code) {
     const body = { t: tokenOf(code), date: $('md_' + code).value, start_time: $('mf_' + code).value, end_time: $('mt_' + code).value, preview: true };
     const r = await api(`/api/advance/${code}/modify`, 'POST', body);
@@ -263,7 +263,7 @@
     if (!r.ok) { $('me_' + code).textContent = r.data.error || 'Error'; return; }
     loadMine(); loadLots();
   }
-
+ 
   init();
   setInterval(() => {   // waiting queue ka status auto-update (jab user change-time box bhar raha ho tab refresh nahi)
     if (document.querySelector('.box[data-open="1"]')) return;

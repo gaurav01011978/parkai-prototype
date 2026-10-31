@@ -13,9 +13,11 @@
         <a href="/" class="logo">Park<span>AI</span><small> SMART PARKING</small></a>
         <div class="nav-links">
             <a href="#features">Features</a>
-            <a href="#portals">Portals</a>
+            <a href="#drivers">Regular User</a>
+            <a href="#staff">Operator</a>
+            <a href="/plans">Plans</a>
         </div>
-        <a href="#portals" class="nav-button">Get Started ↗</a>
+        <a href="{{ url_for('user_page') }}" class="nav-button">Find parking ↗</a>
     </nav>
 
     <main>
@@ -27,18 +29,27 @@
             </h1>
 
             <p class="hero-description">
-                Find smarter parking solutions with AI-powered occupancy
-                predictions, real-time parking updates, and intelligent
-                parking recommendations.
+                See what's free right now, plan ahead, and let the AI assistant
+                do the booking. Live availability, smart recommendations and
+                advance reservations, all in one place.
             </p>
 
             <div class="hero-actions">
-                <a href="#portals" class="primary-button">
-                    Explore ParkAI <span>→</span>
+                <a href="{{ url_for('user_page') }}" class="primary-button">
+                    Find parking now <span>→</span>
                 </a>
-                <a href="#features" class="secondary-button">
-                    Discover features
+                <a href="/advance" class="secondary-button">
+                    Book in advance
                 </a>
+                <a href="/assistant" class="secondary-button">
+                    ✦ Ask the AI assistant
+                </a>
+            </div>
+
+            <div class="live-strip" id="live" hidden aria-live="polite">
+                <div class="live-item"><strong id="liveFree">–</strong><span>spaces free right now</span></div>
+                <div class="live-item"><strong id="liveLots">–</strong><span>parking lots</span></div>
+                <div class="live-item"><strong id="liveBest">–</strong><span>most space available</span></div>
             </div>
 
             <div class="hero-note">
@@ -51,8 +62,8 @@
             <div class="feature">
                 <div class="feature-icon">◷</div>
                 <div>
-                    <h3>Occupancy insights</h3>
-                    <p>Understand parking availability and occupancy trends.</p>
+                    <h3>Live availability</h3>
+                    <p>Track entries, exits and the spaces actually free after reservations.</p>
                 </div>
             </div>
 
@@ -60,31 +71,120 @@
                 <div class="feature-icon">⌖</div>
                 <div>
                     <h3>Smart recommendations</h3>
-                    <p>Rank parking lots by availability, prediction and distance.</p>
+                    <p>Rank lots by free space, predicted occupancy and distance.</p>
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">▣</div>
+                <div>
+                    <h3>Advance reservations</h3>
+                    <p>Pick a date and time up to 5 days ahead. Book earlier, pay less.</p>
                 </div>
             </div>
 
             <div class="feature">
                 <div class="feature-icon">↗</div>
                 <div>
-                    <h3>Live updates</h3>
-                    <p>Track parking entries, exits and available spaces.</p>
+                    <h3>Early-arrival help</h3>
+                    <p>Arrived early? Get moved to a nearby lot or join a fair waiting queue.</p>
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">✦</div>
+                <div>
+                    <h3>AI assistant</h3>
+                    <p>Ask in plain words to find, book or cancel. It always asks first.</p>
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">★</div>
+                <div>
+                    <h3>Free to use, plans to upgrade</h3>
+                    <p>Search and reservations are free. Plans unlock the assistant.</p>
                 </div>
             </div>
         </section>
 
-        <section class="portals" id="portals">
+        <section class="portals" id="drivers">
             <div class="section-heading">
-                <span class="eyebrow">YOUR PARKAI WORKSPACE</span>
-                <h2>How would you like to continue?</h2>
-                <p>Choose the portal that matches your role.</p>
+                <span class="eyebrow">FOR DRIVERS</span>
+                <h2>Where would you like to start?</h2>
+                <p>Find a space, plan your trip, or just ask.</p>
             </div>
 
-            <div class="card-container">
+            <div class="card-container card-container-drivers">
+                <a href="{{ url_for('user_page') }}" class="portal-card">
+                    <div class="card-top">
+                        <div class="card-icon user-icon">⌖</div>
+                        <span class="card-number">01</span>
+                    </div>
+                    <h3>Find parking</h3>
+                    <p>Explore parking options and get recommendations
+                       based on availability, predicted occupancy and distance.</p>
+                    <div class="card-link">Explore parking <span>→</span></div>
+                </a>
+
+                <a href="/advance" class="portal-card">
+                    <div class="card-top">
+                        <div class="card-icon reserve-icon">◷</div>
+                        <span class="card-number">02</span>
+                    </div>
+                    <h3>Advance reserve</h3>
+                    <p>Pick a date, start time and end time up to 5 days ahead.
+                       Early arrival? Get moved to a nearby lot or join the queue.</p>
+                    <div class="card-link">Book in advance <span>→</span></div>
+                </a>
+
+                <a href="{{ url_for('reserve_page') }}" class="portal-card">
+                    <div class="card-top">
+                        <div class="card-icon reserve-icon">▣</div>
+                        <span class="card-number">03</span>
+                    </div>
+                    <h3>Reserve now</h3>
+                    <p>Hold slots right away, pay online, and get a gate OTP
+                       for a smooth check-in.</p>
+                    <div class="card-link">Reserve slots <span>→</span></div>
+                </a>
+
+                <a href="/assistant" class="portal-card portal-featured">
+                    <div class="card-top">
+                        <div class="card-icon ai-icon">✦</div>
+                        <span class="badge-new">AI</span>
+                    </div>
+                    <h3>AI assistant</h3>
+                    <p>Chat to find parking, get prices, and book or cancel
+                       reservations. Available with a ParkAI plan.</p>
+                    <div class="card-link">Open assistant <span>→</span></div>
+                </a>
+
+                <a href="/plans" class="portal-card">
+                    <div class="card-top">
+                        <div class="card-icon admin-icon">★</div>
+                        <span class="card-number">05</span>
+                    </div>
+                    <h3>Plans</h3>
+                    <p>Basic, Pro and Premium plans for the AI assistant.
+                       Manual search and reservations stay free.</p>
+                    <div class="card-link">View plans <span>→</span></div>
+                </a>
+            </div>
+        </section>
+
+        <section class="portals portals-staff" id="staff">
+            <div class="section-heading">
+                <span class="eyebrow">FOR PARKING STAFF</span>
+                <h2>Run the lots</h2>
+                <p>Tools for the people who keep parking moving.</p>
+            </div>
+
+            <div class="card-container card-container-staff">
                 <a href="{{ url_for('operator_page') }}" class="portal-card">
                     <div class="card-top">
                         <div class="card-icon operator-icon">↔</div>
-                        <span class="card-number">01</span>
+                        <span class="card-number">06</span>
                     </div>
                     <h3>Operator</h3>
                     <p>Manage parking occupancy, record vehicle entries
@@ -92,48 +192,15 @@
                     <div class="card-link">Open operator portal <span>→</span></div>
                 </a>
 
-                <a href="{{ url_for('user_page') }}" class="portal-card">
-                    <div class="card-top">
-                        <div class="card-icon user-icon">⌖</div>
-                        <span class="card-number">02</span>
-                    </div>
-                    <h3>User</h3>
-                    <p>Explore parking options and get recommendations
-                       based on availability, predicted occupancy and distance.</p>
-                    <div class="card-link">Explore parking <span>→</span></div>
-                </a>
-
                 <a href="{{ url_for('admin_page') }}" class="portal-card">
                     <div class="card-top">
                         <div class="card-icon admin-icon">⚙</div>
-                        <span class="card-number">03</span>
+                        <span class="card-number">07</span>
                     </div>
                     <h3>Admin</h3>
                     <p>Access the administration interface for parking
                        system management.</p>
                     <div class="card-link">Open admin portal <span>→</span></div>
-                </a>
-
-                <a href="{{ url_for('reserve_page') }}" class="portal-card">
-                    <div class="card-top">
-                        <div class="card-icon reserve-icon">▣</div>
-                        <span class="card-number">04</span>
-                    </div>
-                    <h3>Reserve</h3>
-                    <p>Book parking slots in advance, pay online, and get a gate OTP
-                       for a smooth check-in.</p>
-                    <div class="card-link">Reserve slots <span>→</span></div>
-                </a>
-
-                <a href="/advance" class="portal-card">
-                    <div class="card-top">
-                        <div class="card-icon reserve-icon">◷</div>
-                        <span class="card-number">05</span>
-                    </div>
-                    <h3>Advance Reserve</h3>
-                    <p>Pick a date, start time and end time up to 5 days ahead.
-                       Early arrival? Get moved to a nearby lot or join the queue.</p>
-                    <div class="card-link">Book in advance <span>→</span></div>
                 </a>
             </div>
         </section>
@@ -144,6 +211,24 @@
         <p>Intelligent parking. Better journeys.</p>
         <span>© 2026 ParkAI Prototype</span>
     </footer>
+
+    <script>
+        // Live strip: real numbers from /api/lots. If the request fails the strip stays hidden.
+        (async function () {
+            try {
+                const r = await fetch('/api/lots');
+                if (!r.ok) return;
+                const lots = await r.json();
+                if (!Array.isArray(lots) || !lots.length) return;
+                const free = lots.reduce((n, l) => n + (l.free || 0), 0);
+                const best = lots.slice().sort((a, b) => b.free - a.free)[0];
+                document.getElementById('liveFree').textContent = free;
+                document.getElementById('liveLots').textContent = lots.length;
+                document.getElementById('liveBest').textContent = best.name;
+                document.getElementById('live').hidden = false;
+            } catch (e) { /* keep hidden */ }
+        })();
+    </script>
 
 </body>
 </html>
